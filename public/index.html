@@ -3,179 +3,206 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Онлайн-табло — Аэропорт Тюменский (TUM)</title>
+  <title>Онлайн-табло | Аэропорт Тюменский TUM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+  <div class="noise-overlay"></div>
+  <div class="grid-background"></div>
+  
   <div class="app-container">
-    <!-- Шапка -->
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
     <header class="header">
+      <div class="header-line"></div>
       <div class="header-content">
-        <div class="header-left">
-          <i class="fas fa-plane-departure"></i>
-          <div>
-            <h1>Аэропорт Тюменский</h1>
-            <span class="iata-code">TUM</span>
+        <div class="header-brand">
+          <div class="brand-icon">
+            <svg viewBox="0 0 40 40" fill="none">
+              <path d="M20 4L36 32H4L20 4Z" stroke="currentColor" stroke-width="2" fill="none"/>
+              <circle cx="20" cy="22" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+              <line x1="20" y1="26" x2="20" y2="34" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>АЭРОПОРТ ТЮМЕНСКИЙ</h1>
+            <span class="brand-subtitle">ROSHCHINO INTERNATIONAL</span>
+          </div>
+          <div class="iata-mega-badge">
+            <span>TUM</span>
+            <div class="badge-glow"></div>
           </div>
         </div>
-        <div class="header-right">
-          <div class="clock" id="clock">--:--</div>
-          <button class="admin-btn" id="adminToggle">
-            <i class="fas fa-cog"></i> Администрирование
+        
+        <div class="header-meta">
+          <div class="weather-widget">
+            <i class="fas fa-cloud-sun"></i>
+            <span>-12°C</span>
+          </div>
+          <div class="mega-clock">
+            <div class="mega-clock-time" id="clock">00:00</div>
+            <div class="mega-clock-sec" id="clockSec">00</div>
+            <div class="mega-clock-date" id="clockDate">01.01.2024</div>
+          </div>
+          <button class="admin-trigger" id="adminToggle">
+            <i class="fas fa-sliders"></i>
+            <span>Управление</span>
           </button>
         </div>
       </div>
     </header>
 
-    <!-- Панель администратора -->
+    <!-- ПАНЕЛЬ УПРАВЛЕНИЯ -->
     <div class="admin-panel" id="adminPanel" style="display: none;">
-      <div class="admin-panel-header">
-        <h2><i class="fas fa-sliders-h"></i> Управление рейсами</h2>
-        <button class="btn-add" id="addFlightBtn">
-          <i class="fas fa-plus"></i> Добавить рейс
-        </button>
+      <div class="admin-inner">
+        <div class="admin-top-bar">
+          <h2><i class="fas fa-layer-group"></i> Панель управления рейсами</h2>
+          <button class="btn-glass-primary" id="addFlightBtn">
+            <i class="fas fa-plus-circle"></i> Добавить рейс
+          </button>
+        </div>
+        
+        <div class="flight-form-glass" id="flightForm" style="display: none;">
+          <h3 id="formTitle">Новый рейс</h3>
+          <form id="flightFormInner">
+            <input type="hidden" id="flightId">
+            <div class="form-grid-3">
+              <div class="input-group-glass">
+                <label>Номер рейса</label>
+                <input type="text" id="flightNumber" required placeholder="SU-1234">
+              </div>
+              <div class="input-group-glass">
+                <label>Авиакомпания</label>
+                <input type="text" id="airline" required placeholder="Аэрофлот">
+              </div>
+              <div class="input-group-glass">
+                <label>Направление</label>
+                <input type="text" id="destination" required placeholder="Москва">
+              </div>
+              <div class="input-group-glass">
+                <label>Код IATA</label>
+                <input type="text" id="iataCode" required placeholder="SVO" maxlength="3">
+              </div>
+              <div class="input-group-glass">
+                <label>Вылет по расписанию</label>
+                <input type="datetime-local" id="scheduledDeparture" required>
+              </div>
+              <div class="input-group-glass">
+                <label>Ожидаемый вылет</label>
+                <input type="datetime-local" id="expectedDeparture">
+              </div>
+              <div class="input-group-glass">
+                <label>Начало регистрации</label>
+                <input type="datetime-local" id="checkInStart">
+              </div>
+              <div class="input-group-glass">
+                <label>Конец регистрации</label>
+                <input type="datetime-local" id="checkInEnd">
+              </div>
+              <div class="input-group-glass">
+                <label>Стойки</label>
+                <input type="text" id="checkInCounters" placeholder="12-18">
+              </div>
+              <div class="input-group-glass">
+                <label>Начало посадки</label>
+                <input type="datetime-local" id="boardingStart">
+              </div>
+              <div class="input-group-glass">
+                <label>Конец посадки</label>
+                <input type="datetime-local" id="boardingEnd">
+              </div>
+              <div class="input-group-glass">
+                <label>Выход (Gate)</label>
+                <input type="text" id="boardingGate" placeholder="A12">
+              </div>
+              <div class="input-group-glass">
+                <label>Статус</label>
+                <select id="status">
+                  <option value="scheduled">По расписанию</option>
+                  <option value="delayed">Задержан</option>
+                  <option value="checkin">Регистрация</option>
+                  <option value="checkin_completed">Регистрация окончена</option>
+                  <option value="boarding">Посадка</option>
+                  <option value="boarding_completed">Посадка окончена</option>
+                  <option value="cancelled">Отменён</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-buttons">
+              <button type="submit" class="btn-glass-save"><i class="fas fa-check"></i> Сохранить</button>
+              <button type="button" class="btn-glass-cancel" id="cancelForm"><i class="fas fa-times"></i> Отмена</button>
+            </div>
+          </form>
+        </div>
+        
+        <div class="admin-list" id="adminFlightsList"></div>
       </div>
-      
-      <!-- Форма добавления/редактирования -->
-      <div class="flight-form" id="flightForm" style="display: none;">
-        <h3 id="formTitle">Добавить рейс</h3>
-        <form id="flightFormInner">
-          <input type="hidden" id="flightId">
-          <div class="form-row">
-            <div class="form-group">
-              <label>№ рейса</label>
-              <input type="text" id="flightNumber" required placeholder="SU1234">
-            </div>
-            <div class="form-group">
-              <label>Авиакомпания</label>
-              <input type="text" id="airline" required placeholder="Аэрофлот">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Направление</label>
-              <input type="text" id="destination" required placeholder="Москва">
-            </div>
-            <div class="form-group">
-              <label>Код ИАТА</label>
-              <input type="text" id="iataCode" required placeholder="SVO" maxlength="3">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Время вылета по расписанию</label>
-              <input type="datetime-local" id="scheduledDeparture" required>
-            </div>
-            <div class="form-group">
-              <label>Ожидаемое время вылета</label>
-              <input type="datetime-local" id="expectedDeparture">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Начало регистрации</label>
-              <input type="datetime-local" id="checkInStart">
-            </div>
-            <div class="form-group">
-              <label>Конец регистрации</label>
-              <input type="datetime-local" id="checkInEnd">
-            </div>
-            <div class="form-group">
-              <label>Стойки регистрации</label>
-              <input type="text" id="checkInCounters" placeholder="1-5">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Начало посадки</label>
-              <input type="datetime-local" id="boardingStart">
-            </div>
-            <div class="form-group">
-              <label>Конец посадки</label>
-              <input type="datetime-local" id="boardingEnd">
-            </div>
-            <div class="form-group">
-              <label>Выход на посадку</label>
-              <input type="text" id="boardingGate" placeholder="A1">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Статус</label>
-              <select id="status">
-                <option value="scheduled">По расписанию</option>
-                <option value="delayed">Задержан</option>
-                <option value="checkin">Регистрация</option>
-                <option value="checkin_completed">Регистрация закончена</option>
-                <option value="boarding">Посадка</option>
-                <option value="boarding_completed">Посадка закончена</option>
-                <option value="cancelled">Отменён</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>
-            <button type="button" class="btn-cancel" id="cancelForm"><i class="fas fa-times"></i> Отмена</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Список рейсов в админке -->
-      <div class="admin-flights-list" id="adminFlightsList"></div>
     </div>
 
-    <!-- Основное табло -->
-    <main class="board-container">
-      <div class="board-header">
-        <div class="board-title-section">
-          <h2>Вылет</h2>
-          <span class="board-subtitle">Departures</span>
+    <!-- ОСНОВНОЕ ТАБЛО -->
+    <div class="board-mega">
+      <div class="board-mega-header">
+        <div class="board-mega-tabs">
+          <span class="tab active"><i class="fas fa-plane-departure"></i> ВЫЛЕТ</span>
+          <span class="tab"><i class="fas fa-plane-arrival"></i> ПРИЛЁТ (скоро)</span>
         </div>
-        <div class="board-updated">
-          <i class="fas fa-sync-alt"></i> Обновлено: <span id="lastUpdated">--:--:--</span>
+        <div class="board-live-indicator">
+          <span class="live-dot"></span>
+          LIVE • Обновлено: <span id="lastUpdated">--:--:--</span>
         </div>
       </div>
-
-      <div class="board-table-wrapper">
-        <table class="board-table">
+      
+      <div class="board-mega-table-wrap">
+        <table class="board-mega-table">
           <thead>
             <tr>
-              <th>Время вылета</th>
-              <th>Направление</th>
-              <th>Рейс</th>
-              <th>Авиакомпания</th>
-              <th>Выход</th>
-              <th>Статус</th>
+              <th class="col-time">ВРЕМЯ</th>
+              <th class="col-dest">НАПРАВЛЕНИЕ</th>
+              <th class="col-flight">РЕЙС</th>
+              <th class="col-airline">АВИАКОМПАНИЯ</th>
+              <th class="col-gate">GATE</th>
+              <th class="col-status">СТАТУС</th>
             </tr>
           </thead>
           <tbody id="flightsTableBody">
-            <tr class="no-flights">
+            <tr class="empty-state">
               <td colspan="6">
-                <i class="fas fa-plane"></i>
-                <p>Нет рейсов для отображения</p>
+                <div class="empty-state-content">
+                  <i class="fas fa-cloud-moon"></i>
+                  <p>Нет активных рейсов</p>
+                  <span>Добавьте рейсы через панель управления</span>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </main>
-
-    <!-- Поп-ап с деталями рейса -->
-    <div class="modal-overlay" id="modalOverlay" style="display: none;">
-      <div class="modal" id="flightModal">
-        <div class="modal-header">
-          <h2 id="modalTitle">Детали рейса</h2>
-          <button class="modal-close" id="modalClose">&times;</button>
-        </div>
-        <div class="modal-body" id="modalBody"></div>
-      </div>
     </div>
-
-    <footer class="footer">
-      <p>© 2024 Аэропорт Тюменский. Все права защищены. Информация на табло обновляется автоматически.</p>
+    
+    <footer class="footer-minimal">
+      <span>© 2024 TUM AIRPORT</span>
+      <span class="footer-dot">•</span>
+      <span>ALL RIGHTS RESERVED</span>
+      <span class="footer-dot">•</span>
+      <span>ROSHCHINO</span>
     </footer>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО -->
+  <div class="modal-backdrop" id="modalOverlay" style="display: none;">
+    <div class="modal-glass" id="flightModal">
+      <div class="modal-glass-header">
+        <div class="modal-flight-badge" id="modalBadge"></div>
+        <h2 id="modalTitle">Рейс</h2>
+        <button class="modal-close-btn" id="modalClose">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-glass-body" id="modalBody"></div>
+    </div>
   </div>
 
   <script src="script.js"></script>
