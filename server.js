@@ -1,38 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const { kv } = require('@vercel/kv');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Файл для хранения рейсов (чтобы не пропадали при перезагрузке)
-const DATA_FILE = path.join(__dirname, 'data', 'flights.json');
-
-// Загружаем рейсы из файла
-let flights = [];
-try {
-  if (fs.existsSync(DATA_FILE)) {
-    flights = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-  }
-} catch (e) {
-  console.log('Не удалось загрузить данные, начинаем с пустого');
-}
-
-// Сохраняем рейсы в файл
-function saveFlights() {
-  try {
-    const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(flights, null, 2));
-  } catch (e) {
-    console.log('Не удалось сохранить данные:', e.message);
-  }
-}
+const FLIGHTS_KEY = 'flights';
 
 // Тюменское время (UTC+5)
 const TYUMEN_OFFSET = 5 * 60;
@@ -43,14 +19,12 @@ function getTyumenNow() {
   return new Date(utcMinutes + (TYUMEN_OFFSET * 60000));
 }
 
-// Парсим строку как тюменское время
 function parseTyumenDate(dateStr) {
   if (!dateStr) return null;
   const [datePart, timePart] = dateStr.split('T');
   if (!datePart) return null;
   const [year, month, day] = datePart.split('-').map(Number);
   const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
-  // Создаём UTC дату и вычитаем 5 часов
   const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
   return new Date(utcDate.getTime() - (TYUMEN_OFFSET * 60000));
 }
@@ -64,52 +38,25 @@ function formatTyumenTime(date) {
   return `${h}:${m}`;
 }
 
-// Определение статуса — ИСПРАВЛЕННАЯ ЛОГИКА
 function computeFlightStatus(flight) {
   if (flight.status === 'cancelled') return 'cancelled';
 
   const now = getTyumenNow();
   
-  const boardingStart = parseTyumenDate(flight.boardingStart);
   const boardingEnd = parseTyumenDate(flight.boardingEnd);
-  const checkInStart = parseTyumenDate(flight.checkInStart);
+  const boardingStart = parseTyumenDate(flight.boardingStart);
   const checkInEnd = parseTyumenDate(flight.checkInEnd);
+  const checkInStart = parseTyumenDate(flight.checkInStart);
   const schedDep = parseTyumenDate(flight.scheduledDeparture);
   const expectedDep = parseTyumenDate(flight.expectedDeparture);
 
   const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
 
-  // ПРОВЕРЯЕМ В ПРАВИЛЬНОМ ПОРЯДКЕ: от самого позднего к самому раннему
-  
-  // 1. Посадка закончена: сейчас ПОЗЖЕ окончания посадки
-  if (boardingEnd && now.getTime() > boardingEnd.getTime()) {
-    return 'boarding_completed';
-  }
-  
-  // 2. Идёт посадка: сейчас МЕЖДУ началом и окончанием посадки
-  if (boardingStart && boardingEnd && 
-      now.getTime() >= boardingStart.getTime() && 
-      now.getTime() <= boardingEnd.getTime()) {
-    return 'boarding';
-  }
-  
-  // 3. Регистрация закончена: сейчас ПОЗЖЕ конца регистрации, но посадка ещё не началась
-  if (checkInEnd && now.getTime() > checkInEnd.getTime() && 
-      (!boardingStart || now.getTime() < boardingStart.getTime())) {
-    return 'checkin_completed';
-  }
-  
-  // 4. Идёт регистрация: сейчас МЕЖДУ началом и концом регистрации
-  if (checkInStart && checkInEnd && 
-      now.getTime() >= checkInStart.getTime() && 
-      now.getTime() <= checkInEnd.getTime()) {
-    return 'checkin';
-  }
-  
-  // 5. Задержан
-  if (isDelayed && now.getTime() < expectedDep.getTime()) {
-    return 'delayed';
-  }
+  if (boardingEnd && now.getTime() > boardingEnd.getTime()) return 'boarding_completed';
+  if (boardingStart && boardingEnd && now.getTime() >= boardingStart.getTime() && now.getTime() <= boardingEnd.getTime()) return 'boarding';
+  if (checkInEnd && now.getTime() > checkInEnd.getTime() && (!boardingStart || now.getTime() < boardingStart.getTime())) return 'checkin_completed';
+  if (checkInStart && checkInEnd && now.getTime() >= checkInStart.getTime() && now.getTime() <= checkInEnd.getTime()) return 'checkin';
+  if (isDelayed && now.getTime() < expectedDep.getTime()) return 'delayed';
   
   return 'scheduled';
 }
@@ -146,8 +93,30 @@ function getStatusText(flight) {
   return statusText;
 }
 
+// Загрузка рейсов из KV
+async function getFlights() {
+  try {
+    const data = await kv.get(FLIGHTS_KEY);
+    return data || [];
+  } catch (e) {
+    console.error('Ошибка загрузки из KV:', e.message);
+    return [];
+  }
+}
+
+// Сохранение рейсов в KV
+async function saveFlights(flights) {
+  try {
+    await kv.set(FLIGHTS_KEY, flights);
+  } catch (e) {
+    console.error('Ошибка сохранения в KV:', e.message);
+  }
+}
+
 // API
-app.get('/api/flights', (req, res) => {
+app.get('/api/flights', async (req, res) => {
+  const flights = await getFlights();
+  
   const sorted = [...flights].sort((a, b) => {
     const timeA = parseTyumenDate(a.expectedDeparture || a.scheduledDeparture);
     const timeB = parseTyumenDate(b.expectedDeparture || b.scheduledDeparture);
@@ -163,7 +132,9 @@ app.get('/api/flights', (req, res) => {
   res.json(enriched);
 });
 
-app.post('/api/flights', (req, res) => {
+app.post('/api/flights', async (req, res) => {
+  const flights = await getFlights();
+  
   const flight = {
     id: Date.now().toString(),
     flightNumber: req.body.flightNumber || '',
@@ -180,24 +151,28 @@ app.post('/api/flights', (req, res) => {
     boardingGate: req.body.boardingGate || '',
     status: req.body.status || 'scheduled'
   };
+  
   flights.push(flight);
-  saveFlights();
+  await saveFlights(flights);
   res.status(201).json(flight);
 });
 
-app.put('/api/flights/:id', (req, res) => {
+app.put('/api/flights/:id', async (req, res) => {
+  const flights = await getFlights();
   const index = flights.findIndex(f => f.id === req.params.id);
+  
   if (index === -1) return res.status(404).json({ error: 'Рейс не найден' });
   
   const updated = { ...flights[index], ...req.body, id: flights[index].id };
   flights[index] = updated;
-  saveFlights();
+  await saveFlights(flights);
   res.json(updated);
 });
 
-app.delete('/api/flights/:id', (req, res) => {
+app.delete('/api/flights/:id', async (req, res) => {
+  let flights = await getFlights();
   flights = flights.filter(f => f.id !== req.params.id);
-  saveFlights();
+  await saveFlights(flights);
   res.status(204).send();
 });
 
