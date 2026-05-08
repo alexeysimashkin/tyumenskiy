@@ -7,72 +7,106 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ЗАМЕНИ НА СВОИ ДАННЫЕ
-const TELEGRAM_BOT_TOKEN = '8724795942:AAEHkAv1CC3ZfoF7jOcU3hpTGDsaNaXYbbo';
-const TELEGRAM_CHANNEL_ID = '-1003879219491'; // например: -1001234567890
+// ТВОИ ДАННЫЕ ОТ Telegram
+const BOT_TOKEN = '8724795942:AAEHkAv1CC3ZfoF7jOcU3hpTGDsaNaXYbbo';
+const CHANNEL_ID = '-1003879219491'; // например: -1001234567890
 
-let flights = [];
-let lastMessageId = null;
+// Храним lastMessageId в глобальной переменной (чтобы не терялся)
+global.lastMessageId = global.lastMessageId || null;
+global.flightsCache = global.flightsCache || [];
 
 // Загружаем рейсы из Telegram
 async function loadFlights() {
   try {
+    // Пробуем получить последние обновления
     const response = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?limit=1`
+      `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?limit=5&offset=-5`
     );
     const data = await response.json();
     
     if (data.ok && data.result.length > 0) {
-      const text = data.result[0].channel_post?.text || '';
-      if (text) {
-        flights = JSON.parse(text);
+      // Ищем сообщение из нашего канала
+      for (let i = data.result.length - 1; i >= 0; i--) {
+        const update = data.result[i];
+        const msg = update.channel_post || update.message;
+        if (msg && String(msg.chat.id) === String(CHANNEL_ID) && msg.text) {
+          try {
+            const parsed = JSON.parse(msg.text);
+            if (Array.isArray(parsed)) {
+              global.flightsCache = parsed;
+              global.lastMessageId = msg.message_id;
+              return parsed;
+            }
+          } catch(e) {}
+        }
       }
     }
   } catch (e) {
-    console.log('Ошибка загрузки из Telegram:', e.message);
+    console.log('Ошибка загрузки:', e.message);
   }
-  return flights;
+  return global.flightsCache;
 }
 
 // Сохраняем рейсы в Telegram
-async function saveFlights() {
+async function saveFlights(flights) {
+  global.flightsCache = flights;
   try {
     const text = JSON.stringify(flights);
     
-    if (lastMessageId) {
-      // Редактируем существующее сообщение
-      await fetch(
-        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`,
+    if (global.lastMessageId) {
+      // Пробуем редактировать
+      const editRes = await fetch(
+        `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: TELEGRAM_CHANNEL_ID,
-            message_id: lastMessageId,
+            chat_id: CHANNEL_ID,
+            message_id: global.lastMessageId,
             text: text
           })
         }
       );
+      const editData = await editRes.json();
+      
+      // Если не получилось отредактировать — отправляем новое
+      if (!editData.ok) {
+        const sendRes = await fetch(
+          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: CHANNEL_ID,
+              text: text
+            })
+          }
+        );
+        const sendData = await sendRes.json();
+        if (sendData.ok) {
+          global.lastMessageId = sendData.result.message_id;
+        }
+      }
     } else {
-      // Отправляем новое сообщение
-      const response = await fetch(
-        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      // Первое сообщение
+      const sendRes = await fetch(
+        `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: TELEGRAM_CHANNEL_ID,
+            chat_id: CHANNEL_ID,
             text: text
           })
         }
       );
-      const data = await response.json();
-      if (data.ok) {
-        lastMessageId = data.result.message_id;
+      const sendData = await sendRes.json();
+      if (sendData.ok) {
+        global.lastMessageId = sendData.result.message_id;
       }
     }
   } catch (e) {
-    console.log('Ошибка сохранения в Telegram:', e.message);
+    console.log('Ошибка сохранения:', e.message);
   }
 }
 
@@ -182,7 +216,7 @@ function getStatusText(flight) {
 
 // API
 app.get('/api/flights', async (req, res) => {
-  await loadFlights();
+  const flights = await loadFlights();
   const sorted = [...flights].sort((a, b) => {
     const timeA = parseDate(a.expectedDeparture || a.scheduledDeparture);
     const timeB = parseDate(b.expectedDeparture || b.scheduledDeparture);
@@ -199,7 +233,7 @@ app.get('/api/flights', async (req, res) => {
 });
 
 app.post('/api/flights', async (req, res) => {
-  await loadFlights();
+  let flights = await loadFlights();
   const flight = {
     id: Date.now().toString(),
     flightNumber: req.body.flightNumber || '',
@@ -217,24 +251,24 @@ app.post('/api/flights', async (req, res) => {
     status: req.body.status || 'scheduled'
   };
   flights.push(flight);
-  await saveFlights();
+  await saveFlights(flights);
   res.status(201).json(flight);
 });
 
 app.put('/api/flights/:id', async (req, res) => {
-  await loadFlights();
+  let flights = await loadFlights();
   const index = flights.findIndex(f => f.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: 'Рейс не найден' });
   
   flights[index] = { ...flights[index], ...req.body, id: flights[index].id };
-  await saveFlights();
+  await saveFlights(flights);
   res.json(flights[index]);
 });
 
 app.delete('/api/flights/:id', async (req, res) => {
-  await loadFlights();
+  let flights = await loadFlights();
   flights = flights.filter(f => f.id !== req.params.id);
-  await saveFlights();
+  await saveFlights(flights);
   res.status(204).send();
 });
 
@@ -244,7 +278,7 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
+  console.log(`Сервер на порту ${PORT}`);
 });
 
 module.exports = app;
