@@ -7,7 +7,9 @@
   --gray-50: #F8FAFC;
   --gray-100: #F1F5F9;
   --gray-200: #E2E8F0;
+  --gray-300: #CBD5E1;
   --gray-400: #94A3B8;
+  --gray-500: #64748B;
   --gray-600: #475569;
   --gray-800: #1E293B;
   --red: #EF4444;
@@ -500,7 +502,7 @@ td {
   color: var(--blue);
 }
 
-/* STATUS */
+/* STATUS TAGS */
 .status-tag {
   display: inline-block;
   padding: 6px 16px;
@@ -526,19 +528,19 @@ td {
   50% { opacity: 0.5; }
 }
 
-/* EMPTY */
+/* EMPTY STATE */
 .empty td { padding: 60px 20px !important; }
 .empty-msg { text-align: center; color: var(--gray-400); }
 .empty-msg i { font-size: 40px; margin-bottom: 8px; opacity: 0.3; }
 .empty-msg p { font-size: 15px; font-weight: 500; }
 
-/* ========== MODAL ========== */
+/* ========== ПОЛНОЭКРАННЫЙ ПОПАП ========== */
 .modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(15,23,42,0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
   align-items: center;
   justify-content: center;
   z-index: 1000;
@@ -550,17 +552,17 @@ td {
 
 .modal {
   background: white;
-  border-radius: 20px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 80vh;
+  border-radius: 24px;
+  width: 95%;
+  max-width: 700px;
+  max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 30px 80px rgba(0,0,0,0.25);
-  animation: modalIn 0.3s ease;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.3);
+  animation: modalIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalIn {
-  from { transform: scale(0.92) translateY(10px); opacity: 0; }
+  from { transform: scale(0.9) translateY(20px); opacity: 0; }
   to { transform: scale(1) translateY(0); opacity: 1; }
 }
 
@@ -568,18 +570,24 @@ td {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: 24px 28px;
   border-bottom: 1px solid var(--gray-200);
+  position: sticky;
+  top: 0;
+  background: white;
+  border-radius: 24px 24px 0 0;
+  z-index: 2;
 }
 
 .modal-head h2 {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--gray-800);
 }
 
 .modal-head button {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 1px solid var(--gray-200);
   background: white;
@@ -587,86 +595,256 @@ td {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  font-size: 16px;
   color: var(--gray-600);
+  transition: all 0.2s;
 }
 
 .modal-head button:hover {
-  background: var(--gray-50);
+  background: var(--red-bg);
+  border-color: var(--red);
+  color: var(--red);
 }
 
-.modal-content { padding: 24px; }
+.modal-content {
+  padding: 0;
+}
 
-.modal-flight-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+/* Полноэкранный контент */
+.modal-fullscreen {
+  padding: 28px 28px 40px;
+}
+
+.modal-fs-header {
   margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--gray-200);
 }
 
-.modal-flight-num {
-  font-size: 28px;
+.modal-fs-flightnum {
+  font-size: 32px;
   font-weight: 900;
   color: var(--blue);
+  letter-spacing: -0.5px;
 }
 
-.modal-flight-dest {
+.modal-fs-airline {
+  font-size: 16px;
+  color: var(--gray-600);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Баннер задержки */
+.modal-delay-banner {
+  background: var(--amber-bg);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
   font-size: 18px;
   font-weight: 700;
-  margin-top: 2px;
+  color: var(--amber);
 }
 
-.modal-flight-iata {
-  font-size: 13px;
-  color: var(--gray-400);
-  margin-top: 2px;
+.modal-delay-banner i {
+  font-size: 24px;
+  animation: pulse 2s infinite;
 }
 
-.modal-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+/* Направление */
+.modal-fs-destination {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
-.modal-cell {
-  background: var(--gray-50);
-  padding: 14px 16px;
+.modal-fs-destination h2 {
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--gray-800);
+  letter-spacing: -1px;
+}
+
+.modal-fs-iata {
+  background: var(--blue-bg);
+  color: var(--blue);
+  padding: 4px 14px;
   border-radius: 10px;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 2px;
 }
 
-.modal-cell label {
-  font-size: 9px;
+.modal-fs-info-row {
+  color: var(--gray-400);
+  font-size: 14px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 6px;
+}
+
+.modal-fs-separator {
+  color: var(--gray-300);
+}
+
+/* Таблица */
+.modal-fs-table {
+  background: var(--gray-50);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  border: 1px solid var(--gray-200);
+}
+
+.modal-fs-table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1.2fr 0.8fr 0.8fr;
+  padding: 14px 20px;
+  font-size: 13px;
+}
+
+.modal-fs-table-row.header {
+  background: var(--gray-100);
   font-weight: 700;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--gray-400);
-  display: block;
-  margin-bottom: 4px;
 }
 
-.modal-cell .val {
+.modal-fs-table-row:not(.header) {
+  font-size: 16px;
+  color: var(--gray-800);
+}
+
+/* Таймлайн */
+.modal-fs-timeline {
+  margin-bottom: 28px;
+}
+
+.modal-fs-timeline h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.timeline-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 14px;
+  padding: 12px 0;
+  position: relative;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 32px;
+  bottom: -12px;
+  width: 2px;
+  background: var(--gray-200);
+}
+
+.timeline-item:last-child::before {
+  display: none;
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--gray-200);
+  margin-top: 4px;
+  flex-shrink: 0;
+  z-index: 1;
+  border: 2px solid white;
+}
+
+.timeline-item.done .timeline-dot {
+  background: var(--green);
+}
+
+.timeline-item.active .timeline-dot {
+  background: var(--blue);
+  animation: pulse 2s infinite;
+}
+
+.timeline-content {
+  flex: 1;
+}
+
+.timeline-time {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.timeline-date {
+  font-size: 12px;
+  color: var(--gray-400);
+  margin-top: 1px;
+}
+
+.timeline-label {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+/* Статус */
+.modal-fs-status {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+/* Доп. информация */
+.modal-fs-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.modal-fs-extra-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.extra-label {
+  font-size: 13px;
+  color: var(--gray-400);
+}
+
+.extra-value {
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-800);
 }
 
-.modal-status-big {
-  margin-top: 20px;
-  text-align: center;
-  padding: 16px;
-  background: var(--gray-50);
-  border-radius: 12px;
-}
-
-/* ========== RESPONSIVE ========== */
+/* ========== АДАПТИВНОСТЬ ========== */
 @media (max-width: 768px) {
   .form-grid { grid-template-columns: 1fr 1fr; }
-  .modal-grid { grid-template-columns: 1fr; }
+  .modal-fs-table-row { grid-template-columns: 1fr 1fr 1fr; font-size: 11px; }
+  .modal-fs-destination h2 { font-size: 26px; }
+  .modal-fs-flightnum { font-size: 24px; }
   .header-inner { flex-direction: column; text-align: center; }
 }
 
 @media (max-width: 480px) {
   .form-grid { grid-template-columns: 1fr; }
+  .modal-fs-table-row { grid-template-columns: 1fr 1fr; gap: 6px; }
 }
