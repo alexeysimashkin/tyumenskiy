@@ -14,51 +14,66 @@ const modalOverlay = $('modalOverlay');
 const modalBody = $('modalBody');
 const modalTitle = $('modalTitle');
 
-// Часы
+// Тюменское время (UTC+5)
+const TYUMEN_OFFSET = 5 * 60;
+
 function getTyumenNow() {
   const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utc + (5 * 3600000));
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utcMs + (TYUMEN_OFFSET * 60000));
 }
 
 setInterval(() => {
   const now = getTyumenNow();
-  clockTime.textContent = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  clockTime.textContent = `${h}:${m}`;
 }, 1000);
 
-// Формат даты
-const fmtDt = (s) => {
-  if (!s) return '—';
-  const d = new Date(s);
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}.${month}.${year}, ${h}:${m}`;
-};
+// Парсим дату из строки (строка = тюменское время)
+function parseTyumenDate(dateStr) {
+  if (!dateStr) return null;
+  const [datePart, timePart] = dateStr.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = (timePart || '00:00').split(':').map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+  return new Date(utcDate.getTime() - (TYUMEN_OFFSET * 60000));
+}
 
+// Форматирование
 const fmtTm = (s) => {
   if (!s) return '—';
-  const d = new Date(s);
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
+  const d = parseTyumenDate(s);
+  if (!d) return '—';
+  const tyumenMs = d.getTime() + (TYUMEN_OFFSET * 60000);
+  const nd = new Date(tyumenMs);
+  const h = String(nd.getUTCHours()).padStart(2, '0');
+  const m = String(nd.getUTCMinutes()).padStart(2, '0');
   return `${h}:${m}`;
+};
+
+const fmtDt = (s) => {
+  if (!s) return '—';
+  const d = parseTyumenDate(s);
+  if (!d) return '—';
+  const tyumenMs = d.getTime() + (TYUMEN_OFFSET * 60000);
+  const nd = new Date(tyumenMs);
+  const h = String(nd.getUTCHours()).padStart(2, '0');
+  const m = String(nd.getUTCMinutes()).padStart(2, '0');
+  const day = String(nd.getUTCDate()).padStart(2, '0');
+  const month = String(nd.getUTCMonth() + 1).padStart(2, '0');
+  const year = nd.getUTCFullYear();
+  return `${day}.${month}.${year}, ${h}:${m}`;
 };
 
 const fmtDateOnly = (s) => {
   if (!s) return '—';
-  const d = new Date(s);
+  const d = parseTyumenDate(s);
+  if (!d) return '—';
+  const tyumenMs = d.getTime() + (TYUMEN_OFFSET * 60000);
+  const nd = new Date(tyumenMs);
   const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-  return `${d.getDate()} ${months[d.getMonth()]}`;
-};
-
-const fmtTimeOnly = (s) => {
-  if (!s) return '—';
-  const d = new Date(s);
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+  return `${nd.getUTCDate()} ${months[nd.getUTCMonth()]}`;
 };
 
 // Загрузка
@@ -68,7 +83,10 @@ async function load() {
   renderBoard();
   renderAdmin();
   const now = getTyumenNow();
-  lastUpdated.textContent = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  lastUpdated.textContent = `${h}:${m}:${s}`;
 }
 
 // Табло
@@ -78,11 +96,15 @@ function renderBoard() {
     return;
   }
   tbody.innerHTML = currentFlights.map(f => {
-    const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
+    const sched = parseTyumenDate(f.scheduledDeparture);
+    const exp = parseTyumenDate(f.expectedDeparture);
+    const delayed = exp && sched && exp.getTime() > sched.getTime();
     const cancelled = f.status === 'cancelled';
+    
     let timeHtml = cancelled ? `<span class="time-old">${fmtTm(f.scheduledDeparture)}</span>` :
       delayed ? `<span class="time-old">${fmtTm(f.scheduledDeparture)}</span><br><span class="time-new">${fmtTm(f.expectedDeparture)}</span>` :
       fmtTm(f.scheduledDeparture);
+    
     let tagClass = 'tag-ok';
     if (cancelled) tagClass = 'tag-cancel';
     else if (f.computedStatus === 'checkin') tagClass = 'tag-checkin';
@@ -90,6 +112,7 @@ function renderBoard() {
     else if (f.computedStatus === 'boarding') tagClass = 'tag-boarding';
     else if (f.computedStatus === 'boarding_completed') tagClass = 'tag-boarding-end';
     else if (f.computedStatus === 'delayed') tagClass = 'tag-delay';
+    
     return `<tr onclick="showDetail('${f.id}')">
       <td class="time-cell">${timeHtml}</td>
       <td><div class="dest-cell"><span class="dest-name">${f.destination}</span><span class="dest-iata">${f.iataCode}</span></div></td>
@@ -146,7 +169,10 @@ window.showDetail = function(id) {
   else if (f.computedStatus === 'boarding_completed') tagClass = 'tag-boarding-end';
   else if (f.computedStatus === 'delayed') tagClass = 'tag-delay';
 
-  const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
+  const sched = parseTyumenDate(f.scheduledDeparture);
+  const exp = parseTyumenDate(f.expectedDeparture);
+  const delayed = exp && sched && exp.getTime() > sched.getTime();
+  
   const delayHtml = delayed ? `
     <div class="modal-delay-banner">
       <i class="fas fa-clock"></i>
@@ -179,8 +205,8 @@ window.showDetail = function(id) {
         </div>
         <div class="modal-fs-table-row">
           <div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div>
-          <div><strong>${fmtTimeOnly(f.scheduledDeparture)}</strong></div>
-          <div><strong>${fmtTimeOnly(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
+          <div><strong>${fmtTm(f.scheduledDeparture)}</strong></div>
+          <div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
           <div><strong>${f.boardingGate || '—'}</strong></div>
           <div><strong>А</strong></div>
         </div>
@@ -188,26 +214,26 @@ window.showDetail = function(id) {
       <div class="modal-fs-timeline">
         <h3>Регистрация</h3>
         <div class="timeline-items">
-          <div class="timeline-item ${f.computedStatus === 'checkin_completed' || f.computedStatus === 'boarding' || f.computedStatus === 'boarding_completed' ? 'done' : ''}">
+          <div class="timeline-item ${['checkin_completed','boarding','boarding_completed'].includes(f.computedStatus) ? 'done' : ''}">
             <div class="timeline-dot"></div>
             <div class="timeline-content">
-              <div class="timeline-time">${fmtTimeOnly(f.checkInStart)}</div>
+              <div class="timeline-time">${fmtTm(f.checkInStart)}</div>
               <div class="timeline-date">${fmtDateOnly(f.checkInStart)}</div>
               <div class="timeline-label">Начало регистрации${f.checkInCounters ? ' • Стойки ' + f.checkInCounters : ''}</div>
             </div>
           </div>
-          <div class="timeline-item ${f.computedStatus === 'checkin_completed' || f.computedStatus === 'boarding' || f.computedStatus === 'boarding_completed' ? 'done' : ''}">
+          <div class="timeline-item ${['checkin_completed','boarding','boarding_completed'].includes(f.computedStatus) ? 'done' : ''}">
             <div class="timeline-dot"></div>
             <div class="timeline-content">
-              <div class="timeline-time">${fmtTimeOnly(f.checkInEnd)}</div>
+              <div class="timeline-time">${fmtTm(f.checkInEnd)}</div>
               <div class="timeline-date">${fmtDateOnly(f.checkInEnd)}</div>
               <div class="timeline-label">Окончание регистрации</div>
             </div>
           </div>
-          <div class="timeline-item ${f.computedStatus === 'boarding' || f.computedStatus === 'boarding_completed' ? 'active' : ''}">
+          <div class="timeline-item ${['boarding','boarding_completed'].includes(f.computedStatus) ? 'active' : ''}">
             <div class="timeline-dot"></div>
             <div class="timeline-content">
-              <div class="timeline-time">${fmtTimeOnly(f.boardingStart)}</div>
+              <div class="timeline-time">${fmtTm(f.boardingStart)}</div>
               <div class="timeline-date">${fmtDateOnly(f.boardingStart)}</div>
               <div class="timeline-label">Начало посадки${f.boardingGate ? ' • Выход ' + f.boardingGate : ''}</div>
             </div>
@@ -255,13 +281,11 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Админка переключатель
+// Админка
 $('adminToggle').onclick = () => {
-  const vis = adminPanel.style.display !== 'none';
-  adminPanel.style.display = vis ? 'none' : 'block';
+  adminPanel.style.display = adminPanel.style.display !== 'none' ? 'none' : 'block';
 };
 
-// Добавить рейс
 $('addFlightBtn').onclick = () => {
   editingId = null;
   formTitle.textContent = 'Новый рейс';
@@ -272,7 +296,6 @@ $('addFlightBtn').onclick = () => {
 
 $('cancelForm').onclick = () => { flightForm.style.display = 'none'; };
 
-// Редактировать
 window.editFlight = function(id) {
   const f = currentFlights.find(x => x.id === id);
   if (!f) return;
@@ -283,15 +306,12 @@ window.editFlight = function(id) {
   $('airline').value = f.airline;
   $('destination').value = f.destination;
   $('iataCode').value = f.iataCode;
-  
-  // Берём дату как есть и обрезаем до "YYYY-MM-DDTHH:MM"
   $('scheduledDeparture').value = f.scheduledDeparture ? f.scheduledDeparture.slice(0, 16) : '';
   $('expectedDeparture').value = f.expectedDeparture ? f.expectedDeparture.slice(0, 16) : '';
   $('checkInStart').value = f.checkInStart ? f.checkInStart.slice(0, 16) : '';
   $('checkInEnd').value = f.checkInEnd ? f.checkInEnd.slice(0, 16) : '';
   $('boardingStart').value = f.boardingStart ? f.boardingStart.slice(0, 16) : '';
   $('boardingEnd').value = f.boardingEnd ? f.boardingEnd.slice(0, 16) : '';
-  
   $('checkInCounters').value = f.checkInCounters || '';
   $('boardingGate').value = f.boardingGate || '';
   $('status').value = f.status;
@@ -299,18 +319,14 @@ window.editFlight = function(id) {
   flightForm.scrollIntoView({ behavior: 'smooth' });
 };
 
-// Удалить
 window.deleteFlight = async function(id) {
   if (!confirm('Удалить рейс?')) return;
   await fetch(`${API}/${id}`, { method:'DELETE' });
   load();
 };
 
-// Сохранить
 $('flightFormInner').onsubmit = async function(e) {
   e.preventDefault();
-  
-  // Сохраняем ТОЧНО то, что ввёл пользователь (без конвертации в UTC)
   const body = {
     flightNumber: $('flightNumber').value,
     airline: $('airline').value,
@@ -326,7 +342,6 @@ $('flightFormInner').onsubmit = async function(e) {
     boardingGate: $('boardingGate').value,
     status: $('status').value
   };
-  
   const url = editingId ? `${API}/${editingId}` : API;
   await fetch(url, { 
     method: editingId?'PUT':'POST', 
@@ -338,6 +353,5 @@ $('flightFormInner').onsubmit = async function(e) {
   load();
 };
 
-// Автообновление
 setInterval(load, 30000);
 load();
