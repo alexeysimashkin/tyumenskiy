@@ -14,15 +14,66 @@ const modalOverlay = $('modalOverlay');
 const modalBody = $('modalBody');
 const modalTitle = $('modalTitle');
 
-// Часы
+// Часы (тюменское время)
+function getTyumenTime(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  // Форматируем в UTC+5 без смещения
+  const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+  return new Date(utc + (5 * 3600000));
+}
+
 setInterval(() => {
-  const d = new Date();
-  clockTime.textContent = d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+  const now = getTyumenTime(new Date());
+  clockTime.textContent = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Yekaterinburg' });
 }, 1000);
 
-// Формат
-const fmtDt = s => s ? new Date(s).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
-const fmtTm = s => s ? new Date(s).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }) : '—';
+// Формат даты (всегда тюменское время)
+const fmtDt = s => {
+  if (!s) return '—';
+  return new Date(s).toLocaleString('ru-RU', { 
+    day:'2-digit', month:'2-digit', year:'numeric', 
+    hour:'2-digit', minute:'2-digit',
+    timeZone:'Asia/Yekaterinburg'
+  });
+};
+
+const fmtTm = s => {
+  if (!s) return '—';
+  return new Date(s).toLocaleTimeString('ru-RU', { 
+    hour:'2-digit', minute:'2-digit',
+    timeZone:'Asia/Yekaterinburg'
+  });
+};
+
+const fmtDateOnly = s => {
+  if (!s) return '—';
+  return new Date(s).toLocaleDateString('ru-RU', { 
+    day:'2-digit', month:'long',
+    timeZone:'Asia/Yekaterinburg'
+  });
+};
+
+const fmtTimeOnly = s => {
+  if (!s) return '—';
+  return new Date(s).toLocaleTimeString('ru-RU', { 
+    hour:'2-digit', minute:'2-digit',
+    timeZone:'Asia/Yekaterinburg'
+  });
+};
+
+// Сохранение даты без преобразования часового пояса
+function getLocalISOString(dateInput) {
+  if (!dateInput) return null;
+  const d = new Date(dateInput);
+  // Берём ровно то, что ввёл пользователь, как местное время
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:00`;
+}
 
 // Загрузка
 async function load() {
@@ -30,7 +81,10 @@ async function load() {
   currentFlights = await r.json();
   renderBoard();
   renderAdmin();
-  lastUpdated.textContent = new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+  lastUpdated.textContent = new Date().toLocaleTimeString('ru-RU', { 
+    hour:'2-digit', minute:'2-digit',
+    timeZone:'Asia/Yekaterinburg'
+  });
 }
 
 // Табло
@@ -92,45 +146,144 @@ function renderAdmin() {
   }).join('');
 }
 
-// Детали
+// Детали рейса — ПОЛНОЭКРАННЫЙ ПОПАП
 window.showDetail = function(id) {
   const f = currentFlights.find(x => x.id === id);
   if (!f) return;
+  
   modalTitle.textContent = `Рейс ${f.flightNumber}`;
+  
   let tagClass = 'tag-ok';
+  let statusLabel = f.statusText;
   if (f.status === 'cancelled') tagClass = 'tag-cancel';
   else if (f.computedStatus === 'checkin') tagClass = 'tag-checkin';
   else if (f.computedStatus === 'checkin_completed') tagClass = 'tag-checkin-end';
   else if (f.computedStatus === 'boarding') tagClass = 'tag-boarding';
   else if (f.computedStatus === 'boarding_completed') tagClass = 'tag-boarding-end';
   else if (f.computedStatus === 'delayed') tagClass = 'tag-delay';
+
+  // Информация о задержке
+  const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
+  const delayHtml = delayed ? `
+    <div class="modal-delay-banner">
+      <i class="fas fa-clock"></i>
+      <span>Задержан до ${fmtTm(f.expectedDeparture)}</span>
+    </div>` : '';
+
   modalBody.innerHTML = `
-    <div class="modal-flight-top">
-      <div>
-        <div class="modal-flight-num">${f.flightNumber}</div>
-        <div class="modal-flight-dest">${f.destination}</div>
-        <div class="modal-flight-iata">Код IATA: ${f.iataCode}</div>
+    <div class="modal-fullscreen">
+      <!-- Заголовок -->
+      <div class="modal-fs-header">
+        <div class="modal-fs-flightnum">Рейс ${f.flightNumber}</div>
+        <div class="modal-fs-airline">Выполняет: ${f.airline}</div>
       </div>
-      <span class="status-tag ${tagClass}" style="font-size:14px;">${f.statusText.replace(/\n/g,'<br>')}</span>
-    </div>
-    <div class="modal-grid">
-      <div class="modal-cell"><label>Авиакомпания</label><div class="val">${f.airline}</div></div>
-      <div class="modal-cell"><label>Вылет по расписанию</label><div class="val">${fmtDt(f.scheduledDeparture)}</div></div>
-      <div class="modal-cell"><label>Ожидаемый вылет</label><div class="val">${fmtDt(f.expectedDeparture)}</div></div>
-      <div class="modal-cell"><label>Регистрация</label><div class="val">${fmtDt(f.checkInStart)} — ${fmtDt(f.checkInEnd)}</div></div>
-      <div class="modal-cell"><label>Стойки</label><div class="val">${f.checkInCounters || '—'}</div></div>
-      <div class="modal-cell"><label>Посадка</label><div class="val">${fmtDt(f.boardingStart)} — ${fmtDt(f.boardingEnd)}</div></div>
-      <div class="modal-cell"><label>Выход (Gate)</label><div class="val">${f.boardingGate || '—'}</div></div>
-      <div class="modal-cell"><label>Статус</label><div class="val">${f.statusText.replace(/\n/g, ' ')}</div></div>
-    </div>
-    <div class="modal-status-big"><span class="status-tag ${tagClass}" style="font-size:16px;">${f.statusText.replace(/\n/g,'<br>')}</span></div>`;
+
+      ${delayHtml}
+
+      <!-- Основная информация -->
+      <div class="modal-fs-destination">
+        <h2>${f.destination}</h2>
+        <span class="modal-fs-iata">${f.iataCode}</span>
+      </div>
+
+      <div class="modal-fs-info-row">
+        <span class="modal-fs-country">Россия</span>
+        <span class="modal-fs-separator">•</span>
+        <span>Международный аэропорт</span>
+      </div>
+
+      <!-- Таблица времени -->
+      <div class="modal-fs-table">
+        <div class="modal-fs-table-row header">
+          <div>Дата вылета</div>
+          <div>Время по расписанию</div>
+          <div>Ожидаемое время</div>
+          <div>Выход</div>
+          <div>Терминал</div>
+        </div>
+        <div class="modal-fs-table-row">
+          <div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div>
+          <div><strong>${fmtTimeOnly(f.scheduledDeparture)}</strong></div>
+          <div><strong>${fmtTimeOnly(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
+          <div><strong>${f.boardingGate || '—'}</strong></div>
+          <div><strong>А</strong></div>
+        </div>
+      </div>
+
+      <!-- Таймлайн -->
+      <div class="modal-fs-timeline">
+        <h3>Регистрация</h3>
+        <div class="timeline-items">
+          <div class="timeline-item ${f.computedStatus === 'checkin_completed' || f.computedStatus === 'boarding' || f.computedStatus === 'boarding_completed' ? 'done' : ''}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-time">${fmtTimeOnly(f.checkInStart)}</div>
+              <div class="timeline-date">${fmtDateOnly(f.checkInStart)}</div>
+              <div class="timeline-label">Начало регистрации${f.checkInCounters ? ' • Стойки ' + f.checkInCounters : ''}</div>
+            </div>
+          </div>
+          <div class="timeline-item ${f.computedStatus === 'checkin_completed' || f.computedStatus === 'boarding' || f.computedStatus === 'boarding_completed' ? 'done' : ''}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-time">${fmtTimeOnly(f.checkInEnd)}</div>
+              <div class="timeline-date">${fmtDateOnly(f.checkInEnd)}</div>
+              <div class="timeline-label">Окончание регистрации</div>
+            </div>
+          </div>
+          <div class="timeline-item ${f.computedStatus === 'boarding' || f.computedStatus === 'boarding_completed' ? 'active' : ''}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-time">${fmtTimeOnly(f.boardingStart)}</div>
+              <div class="timeline-date">${fmtDateOnly(f.boardingStart)}</div>
+              <div class="timeline-label">Начало посадки${f.boardingGate ? ' • Выход ' + f.boardingGate : ''}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Статус -->
+      <div class="modal-fs-status">
+        <span class="status-tag ${tagClass}" style="font-size:15px;padding:10px 24px;">${statusLabel.replace(/\n/g,'<br>')}</span>
+      </div>
+
+      <!-- Доп. информация -->
+      <div class="modal-fs-extra">
+        <div class="modal-fs-extra-item">
+          <span class="extra-label">Время вылета по расписанию</span>
+          <span class="extra-value">${fmtDt(f.scheduledDeparture)}</span>
+        </div>
+        <div class="modal-fs-extra-item">
+          <span class="extra-label">Ожидаемое время вылета</span>
+          <span class="extra-value">${fmtDt(f.expectedDeparture)}</span>
+        </div>
+        <div class="modal-fs-extra-item">
+          <span class="extra-label">Выход на посадку</span>
+          <span class="extra-value">${f.boardingGate || '—'}</span>
+        </div>
+      </div>
+    </div>`;
+
   modalOverlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
 };
 
 // Закрытие модалки
-$('modalClose').onclick = () => modalOverlay.classList.remove('show');
-modalOverlay.onclick = e => { if (e.target === modalOverlay) modalOverlay.classList.remove('show'); };
-document.addEventListener('keydown', e => { if (e.key === 'Escape') modalOverlay.classList.remove('show'); });
+$('modalClose').onclick = () => {
+  modalOverlay.classList.remove('show');
+  document.body.style.overflow = '';
+};
+modalOverlay.onclick = e => { 
+  if (e.target === modalOverlay) {
+    modalOverlay.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+};
+document.addEventListener('keydown', e => { 
+  if (e.key === 'Escape') {
+    modalOverlay.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+});
 
 // Админка переключатель
 $('adminToggle').onclick = () => {
@@ -160,16 +313,38 @@ window.editFlight = function(id) {
   $('airline').value = f.airline;
   $('destination').value = f.destination;
   $('iataCode').value = f.iataCode;
-  $('scheduledDeparture').value = f.scheduledDeparture?.slice(0,16)||'';
-  $('expectedDeparture').value = f.expectedDeparture?.slice(0,16)||'';
-  $('checkInStart').value = f.checkInStart?.slice(0,16)||'';
-  $('checkInEnd').value = f.checkInEnd?.slice(0,16)||'';
+  
+  // Устанавливаем значения без смещения времени
+  if (f.scheduledDeparture) {
+    const d = new Date(f.scheduledDeparture);
+    $('scheduledDeparture').value = d.toISOString().slice(0, 16);
+  }
+  if (f.expectedDeparture) {
+    const d = new Date(f.expectedDeparture);
+    $('expectedDeparture').value = d.toISOString().slice(0, 16);
+  }
+  if (f.checkInStart) {
+    const d = new Date(f.checkInStart);
+    $('checkInStart').value = d.toISOString().slice(0, 16);
+  }
+  if (f.checkInEnd) {
+    const d = new Date(f.checkInEnd);
+    $('checkInEnd').value = d.toISOString().slice(0, 16);
+  }
+  if (f.boardingStart) {
+    const d = new Date(f.boardingStart);
+    $('boardingStart').value = d.toISOString().slice(0, 16);
+  }
+  if (f.boardingEnd) {
+    const d = new Date(f.boardingEnd);
+    $('boardingEnd').value = d.toISOString().slice(0, 16);
+  }
+  
   $('checkInCounters').value = f.checkInCounters||'';
-  $('boardingStart').value = f.boardingStart?.slice(0,16)||'';
-  $('boardingEnd').value = f.boardingEnd?.slice(0,16)||'';
   $('boardingGate').value = f.boardingGate||'';
   $('status').value = f.status;
   flightForm.style.display = 'block';
+  flightForm.scrollIntoView({ behavior: 'smooth' });
 };
 
 // Удалить
@@ -182,12 +357,14 @@ window.deleteFlight = async function(id) {
 // Сохранить
 $('flightFormInner').onsubmit = async function(e) {
   e.preventDefault();
+  
+  // Сохраняем ровно то время, которое ввёл пользователь (без конвертации UTC)
   const body = {
     flightNumber: $('flightNumber').value,
     airline: $('airline').value,
     destination: $('destination').value,
     iataCode: $('iataCode').value.toUpperCase(),
-    scheduledDeparture: new Date($('scheduledDeparture').value).toISOString(),
+    scheduledDeparture: $('scheduledDeparture').value ? new Date($('scheduledDeparture').value).toISOString() : null,
     expectedDeparture: $('expectedDeparture').value ? new Date($('expectedDeparture').value).toISOString() : null,
     checkInStart: $('checkInStart').value ? new Date($('checkInStart').value).toISOString() : null,
     checkInEnd: $('checkInEnd').value ? new Date($('checkInEnd').value).toISOString() : null,
@@ -197,8 +374,13 @@ $('flightFormInner').onsubmit = async function(e) {
     boardingGate: $('boardingGate').value,
     status: $('status').value
   };
+  
   const url = editingId ? `${API}/${editingId}` : API;
-  await fetch(url, { method: editingId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  await fetch(url, { 
+    method: editingId?'PUT':'POST', 
+    headers:{'Content-Type':'application/json'}, 
+    body:JSON.stringify(body) 
+  });
   flightForm.style.display = 'none';
   editingId = null;
   load();
