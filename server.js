@@ -7,54 +7,97 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хранилище рейсов в памяти (при рестарте сбрасывается)
+// Хранилище рейсов
 let flights = [];
+
+// Вспомогательная: получить текущее время в часовом поясе +5 (Тюмень)
+function getTyumenNow() {
+  const now = new Date();
+  // Преобразуем UTC в Тюменское время (UTC+5)
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc + (5 * 3600000));
+}
 
 // Автоматическое определение статуса
 function computeFlightStatus(flight) {
-  const now = new Date();
-  const schedDep = new Date(flight.scheduledDeparture);
+  const now = getTyumenNow();
+  
+  if (flight.status === 'cancelled') return 'cancelled';
+
+  const schedDep = flight.scheduledDeparture ? new Date(flight.scheduledDeparture) : null;
   const expectedDep = flight.expectedDeparture ? new Date(flight.expectedDeparture) : null;
   const checkInStart = flight.checkInStart ? new Date(flight.checkInStart) : null;
   const checkInEnd = flight.checkInEnd ? new Date(flight.checkInEnd) : null;
   const boardingStart = flight.boardingStart ? new Date(flight.boardingStart) : null;
   const boardingEnd = flight.boardingEnd ? new Date(flight.boardingEnd) : null;
 
-  if (flight.status === 'cancelled') return 'cancelled';
+  // Если есть ожидаемое время и оно позже расписания — задержка
+  const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
 
-  // Приоритет: отменён, потом по стадиям
+  // Проверяем этапы
   if (boardingEnd && now > boardingEnd) return 'boarding_completed';
-  if (boardingStart && now >= boardingStart && (!boardingEnd || now <= boardingEnd)) return 'boarding';
+  if (boardingStart && now >= boardingStart && boardingEnd && now <= boardingEnd) return 'boarding';
   if (checkInEnd && now > checkInEnd && (!boardingStart || now < boardingStart)) return 'checkin_completed';
-  if (checkInStart && now >= checkInStart && (!checkInEnd || now <= checkInEnd)) return 'checkin';
-  if (expectedDep && expectedDep > schedDep && now < expectedDep) return 'delayed';
+  if (checkInStart && now >= checkInStart && checkInEnd && now <= checkInEnd) return 'checkin';
+  
+  if (isDelayed && now < expectedDep) return 'delayed';
+  
   return 'scheduled';
 }
 
 // Получить человекочитаемый статус
 function getStatusText(flight) {
   const status = computeFlightStatus(flight);
+  
+  if (flight.status === 'cancelled') return 'Отменён';
+
   const expectedDep = flight.expectedDeparture ? new Date(flight.expectedDeparture) : null;
-  const schedDep = new Date(flight.scheduledDeparture);
+  const schedDep = flight.scheduledDeparture ? new Date(flight.scheduledDeparture) : null;
+  const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
+
+  const delayedTime = expectedDep ? expectedDep.toLocaleTimeString('ru-RU', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Yekaterinburg'
+  }) : '';
+
   let statusText = 'По расписанию';
 
-  if (flight.status === 'cancelled') return 'cancelled';
-  if (expectedDep && expectedDep > schedDep) {
-    const delayedUntil = expectedDep.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  if (isDelayed) {
     switch (status) {
-      case 'checkin': statusText = `Задержан до ${delayedUntil}\nРегистрация`; break;
-      case 'checkin_completed': statusText = `Задержан до ${delayedUntil}\nРегистрация закончена`; break;
-      case 'boarding': statusText = `Задержан до ${delayedUntil}\nПосадка`; break;
-      case 'boarding_completed': statusText = `Задержан до ${delayedUntil}\nПосадка закончена`; break;
-      default: statusText = `Задержан до ${delayedUntil}`; break;
+      case 'checkin': 
+        statusText = `Задержан до ${delayedTime}\nРегистрация`; 
+        break;
+      case 'checkin_completed': 
+        statusText = `Задержан до ${delayedTime}\nРегистрация закончена`; 
+        break;
+      case 'boarding': 
+        statusText = `Задержан до ${delayedTime}\nПосадка`; 
+        break;
+      case 'boarding_completed': 
+        statusText = `Задержан до ${delayedTime}\nПосадка закончена`; 
+        break;
+      default: 
+        statusText = `Задержан до ${delayedTime}`; 
+        break;
     }
   } else {
     switch (status) {
-      case 'checkin': statusText = 'Регистрация'; break;
-      case 'checkin_completed': statusText = 'Регистрация закончена'; break;
-      case 'boarding': statusText = 'Посадка'; break;
-      case 'boarding_completed': statusText = 'Посадка закончена'; break;
-      default: statusText = 'По расписанию'; break;
+      case 'checkin': 
+        statusText = 'Регистрация'; 
+        break;
+      case 'checkin_completed': 
+        statusText = 'Регистрация закончена'; 
+        break;
+      case 'boarding': 
+        statusText = 'Посадка'; 
+        break;
+      case 'boarding_completed': 
+        statusText = 'Посадка закончена'; 
+        break;
+      default: 
+        statusText = 'По расписанию'; 
+        break;
     }
   }
   return statusText;
@@ -62,7 +105,6 @@ function getStatusText(flight) {
 
 // API маршруты
 app.get('/api/flights', (req, res) => {
-  // Сортируем по ожидаемому времени вылета (или по расписанию)
   const sorted = [...flights].sort((a, b) => {
     const timeA = a.expectedDeparture ? new Date(a.expectedDeparture) : new Date(a.scheduledDeparture);
     const timeB = b.expectedDeparture ? new Date(b.expectedDeparture) : new Date(b.scheduledDeparture);
@@ -84,7 +126,7 @@ app.post('/api/flights', (req, res) => {
     destination: req.body.destination || '',
     iataCode: req.body.iataCode || '',
     airline: req.body.airline || '',
-    scheduledDeparture: req.body.scheduledDeparture || new Date().toISOString(),
+    scheduledDeparture: req.body.scheduledDeparture || null,
     expectedDeparture: req.body.expectedDeparture || null,
     checkInStart: req.body.checkInStart || null,
     checkInEnd: req.body.checkInEnd || null,
