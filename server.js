@@ -7,38 +7,26 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ТВОИ ДАННЫЕ ОТ Telegram
+// ТВОИ ДАННЫЕ
 const BOT_TOKEN = '8724795942:AAEHkAv1CC3ZfoF7jOcU3hpTGDsaNaXYbbo';
 const CHANNEL_ID = '-1003879219491'; // например: -1001234567890
 
-// Храним lastMessageId в глобальной переменной (чтобы не терялся)
-global.lastMessageId = global.lastMessageId || null;
+// Кеш в памяти
 global.flightsCache = global.flightsCache || [];
 
-// Загружаем рейсы из Telegram
+// Загружаем из описания канала
 async function loadFlights() {
   try {
-    // Пробуем получить последние обновления
-    const response = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?limit=5&offset=-5`
+    const res = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/getChat?chat_id=${CHANNEL_ID}`
     );
-    const data = await response.json();
+    const data = await res.json();
     
-    if (data.ok && data.result.length > 0) {
-      // Ищем сообщение из нашего канала
-      for (let i = data.result.length - 1; i >= 0; i--) {
-        const update = data.result[i];
-        const msg = update.channel_post || update.message;
-        if (msg && String(msg.chat.id) === String(CHANNEL_ID) && msg.text) {
-          try {
-            const parsed = JSON.parse(msg.text);
-            if (Array.isArray(parsed)) {
-              global.flightsCache = parsed;
-              global.lastMessageId = msg.message_id;
-              return parsed;
-            }
-          } catch(e) {}
-        }
+    if (data.ok && data.result.description) {
+      const parsed = JSON.parse(data.result.description);
+      if (Array.isArray(parsed)) {
+        global.flightsCache = parsed;
+        return parsed;
       }
     }
   } catch (e) {
@@ -47,64 +35,22 @@ async function loadFlights() {
   return global.flightsCache;
 }
 
-// Сохраняем рейсы в Telegram
+// Сохраняем в описание канала
 async function saveFlights(flights) {
   global.flightsCache = flights;
   try {
     const text = JSON.stringify(flights);
-    
-    if (global.lastMessageId) {
-      // Пробуем редактировать
-      const editRes = await fetch(
-        `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: CHANNEL_ID,
-            message_id: global.lastMessageId,
-            text: text
-          })
-        }
-      );
-      const editData = await editRes.json();
-      
-      // Если не получилось отредактировать — отправляем новое
-      if (!editData.ok) {
-        const sendRes = await fetch(
-          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: CHANNEL_ID,
-              text: text
-            })
-          }
-        );
-        const sendData = await sendRes.json();
-        if (sendData.ok) {
-          global.lastMessageId = sendData.result.message_id;
-        }
+    await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/setChatDescription`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: CHANNEL_ID,
+          description: text
+        })
       }
-    } else {
-      // Первое сообщение
-      const sendRes = await fetch(
-        `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: CHANNEL_ID,
-            text: text
-          })
-        }
-      );
-      const sendData = await sendRes.json();
-      if (sendData.ok) {
-        global.lastMessageId = sendData.result.message_id;
-      }
-    }
+    );
   } catch (e) {
     console.log('Ошибка сохранения:', e.message);
   }
