@@ -29,86 +29,105 @@ function saveFlights() {
   }
 }
 
-const TYUMEN_OFFSET = 5 * 60;
-
+// Тюменское время
 function getTyumenNow() {
   const now = new Date();
-  const utcMinutes = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utcMinutes + (TYUMEN_OFFSET * 60000));
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utcMs + (5 * 3600000));
 }
 
-function parseTyumenDate(dateStr) {
+// Парсим строку даты КАК ЕСТЬ (без конвертации)
+function parseDate(dateStr) {
   if (!dateStr) return null;
+  // "2025-05-08T17:50:00" -> разбираем как локальное время
   const [datePart, timePart] = dateStr.split('T');
-  if (!datePart) return null;
   const [year, month, day] = datePart.split('-').map(Number);
-  const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
-  const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
-  return new Date(utcDate.getTime() - (TYUMEN_OFFSET * 60000));
+  const [hours, minutes] = (timePart || '00:00').split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0);
 }
 
-function formatTyumenTime(date) {
+// Формат времени
+function formatTime(date) {
   if (!date) return '';
-  const tyumenMs = date.getTime() + (TYUMEN_OFFSET * 60000);
-  const d = new Date(tyumenMs);
-  const h = String(d.getUTCHours()).padStart(2, '0');
-  const m = String(d.getUTCMinutes()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
   return `${h}:${m}`;
 }
 
-// НОВАЯ ЖЕЛЕЗНАЯ ЛОГИКА СТАТУСОВ
+// Сравнение двух дат (игнорируем секунды)
+function isSameOrAfter(date1, date2) {
+  if (!date1 || !date2) return false;
+  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
+  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
+  return d1.getTime() >= d2.getTime();
+}
+
+function isSameOrBefore(date1, date2) {
+  if (!date1 || !date2) return false;
+  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
+  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
+  return d1.getTime() <= d2.getTime();
+}
+
+function isAfter(date1, date2) {
+  if (!date1 || !date2) return false;
+  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
+  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
+  return d1.getTime() > d2.getTime();
+}
+
+function isBefore(date1, date2) {
+  if (!date1 || !date2) return false;
+  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
+  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
+  return d1.getTime() < d2.getTime();
+}
+
+// ПРОСТАЯ И ЧЁТКАЯ ЛОГИКА СТАТУСОВ
 function computeFlightStatus(flight) {
   if (flight.status === 'cancelled') return 'cancelled';
 
-  const now = getTyumenNow().getTime();
+  const now = getTyumenNow();
   
-  const checkInStart = parseTyumenDate(flight.checkInStart);
-  const checkInEnd = parseTyumenDate(flight.checkInEnd);
-  const boardingStart = parseTyumenDate(flight.boardingStart);
-  const boardingEnd = parseTyumenDate(flight.boardingEnd);
+  const checkInStart = parseDate(flight.checkInStart);
+  const checkInEnd = parseDate(flight.checkInEnd);
+  const boardingStart = parseDate(flight.boardingStart);
+  const boardingEnd = parseDate(flight.boardingEnd);
   
-  const checkInStartTime = checkInStart ? checkInStart.getTime() : null;
-  const checkInEndTime = checkInEnd ? checkInEnd.getTime() : null;
-  const boardingStartTime = boardingStart ? boardingStart.getTime() : null;
-  const boardingEndTime = boardingEnd ? boardingEnd.getTime() : null;
+  // Флаги — есть ли указанные времена
+  const hasCheckIn = checkInStart && checkInEnd;
+  const hasBoarding = boardingStart && boardingEnd;
 
-  const schedDep = parseTyumenDate(flight.scheduledDeparture);
-  const expectedDep = parseTyumenDate(flight.expectedDeparture);
-  const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
-
-  // Проверяем статусы СТРОГО по времени: от самого активного к менее активному
-  
-  // 1. Посадка закончена: время окончания посадки ПРОШЛО
-  if (boardingEndTime !== null && now > boardingEndTime) {
+  // 1. Сначала проверяем — не закончилась ли посадка?
+  if (hasBoarding && isAfter(now, boardingEnd)) {
     return 'boarding_completed';
   }
-  
-  // 2. Идёт посадка: сейчас МЕЖДУ началом и концом посадки (включая границы)
-  if (boardingStartTime !== null && boardingEndTime !== null && 
-      now >= boardingStartTime && now <= boardingEndTime) {
+
+  // 2. Идёт посадка?
+  if (hasBoarding && isSameOrAfter(now, boardingStart) && isSameOrBefore(now, boardingEnd)) {
     return 'boarding';
   }
-  
-  // 3. Регистрация закончена: время окончания регистрации ПРОШЛО, но посадка ещё не началась
-  if (checkInEndTime !== null && now > checkInEndTime) {
-    // Если посадка ещё не началась — показываем "регистрация закончена"
-    if (!boardingStartTime || now < boardingStartTime) {
+
+  // 3. Регистрация закончена, посадка не началась?
+  if (hasCheckIn && isAfter(now, checkInEnd)) {
+    if (!hasBoarding || isBefore(now, boardingStart)) {
       return 'checkin_completed';
     }
   }
-  
-  // 4. Идёт регистрация: сейчас МЕЖДУ началом и концом регистрации
-  if (checkInStartTime !== null && checkInEndTime !== null && 
-      now >= checkInStartTime && now <= checkInEndTime) {
+
+  // 4. Идёт регистрация?
+  if (hasCheckIn && isSameOrAfter(now, checkInStart) && isSameOrBefore(now, checkInEnd)) {
     return 'checkin';
   }
-  
-  // 5. Задержан
-  if (isDelayed && expectedDep && now < expectedDep.getTime()) {
+
+  // 5. Задержан?
+  const schedDep = parseDate(flight.scheduledDeparture);
+  const expectedDep = parseDate(flight.expectedDeparture);
+  if (expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime() && isBefore(now, expectedDep)) {
     return 'delayed';
   }
-  
-  // 6. Всё остальное — по расписанию
+
+  // 6. По расписанию
   return 'scheduled';
 }
 
@@ -117,10 +136,10 @@ function getStatusText(flight) {
 
   const status = computeFlightStatus(flight);
   
-  const expectedDep = parseTyumenDate(flight.expectedDeparture);
-  const schedDep = parseTyumenDate(flight.scheduledDeparture);
+  const expectedDep = parseDate(flight.expectedDeparture);
+  const schedDep = parseDate(flight.scheduledDeparture);
   const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
-  const delayedTime = expectedDep ? formatTyumenTime(expectedDep) : '';
+  const delayedTime = expectedDep ? formatTime(expectedDep) : '';
 
   if (isDelayed) {
     switch (status) {
@@ -144,8 +163,8 @@ function getStatusText(flight) {
 // API
 app.get('/api/flights', (req, res) => {
   const sorted = [...flights].sort((a, b) => {
-    const timeA = parseTyumenDate(a.expectedDeparture || a.scheduledDeparture);
-    const timeB = parseTyumenDate(b.expectedDeparture || b.scheduledDeparture);
+    const timeA = parseDate(a.expectedDeparture || a.scheduledDeparture);
+    const timeB = parseDate(b.expectedDeparture || b.scheduledDeparture);
     if (!timeA || !timeB) return 0;
     return timeA.getTime() - timeB.getTime();
   });
