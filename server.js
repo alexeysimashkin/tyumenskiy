@@ -7,14 +7,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ТВОИ ДАННЫЕ
 const BOT_TOKEN = '8724795942:AAEHkAv1CC3ZfoF7jOcU3hpTGDsaNaXYbbo';
-const CHANNEL_ID = '-1003879219491'; // например: -1001234567890
+const CHANNEL_ID = '-1003879219491';
 
-// Кеш в памяти
 global.flightsCache = global.flightsCache || [];
 
-// Загружаем из описания канала
+// Загружаем рейсы из закреплённого сообщения
 async function loadFlights() {
   try {
     const res = await fetch(
@@ -22,8 +20,8 @@ async function loadFlights() {
     );
     const data = await res.json();
     
-    if (data.ok && data.result.description) {
-      const parsed = JSON.parse(data.result.description);
+    if (data.ok && data.result.pinned_message && data.result.pinned_message.text) {
+      const parsed = JSON.parse(data.result.pinned_message.text);
       if (Array.isArray(parsed)) {
         global.flightsCache = parsed;
         return parsed;
@@ -35,22 +33,41 @@ async function loadFlights() {
   return global.flightsCache;
 }
 
-// Сохраняем в описание канала
+// Сохраняем рейсы в закреплённое сообщение
 async function saveFlights(flights) {
   global.flightsCache = flights;
   try {
     const text = JSON.stringify(flights);
-    await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/setChatDescription`,
+    
+    // Отправляем новое сообщение
+    const sendRes = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: CHANNEL_ID,
-          description: text
+          text: text
         })
       }
     );
+    const sendData = await sendRes.json();
+    
+    if (sendData.ok) {
+      // Закрепляем его
+      await fetch(
+        `https://api.telegram.org/bot${BOT_TOKEN}/pinChatMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: CHANNEL_ID,
+            message_id: sendData.result.message_id,
+            disable_notification: true
+          })
+        }
+      );
+    }
   } catch (e) {
     console.log('Ошибка сохранения:', e.message);
   }
