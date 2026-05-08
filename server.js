@@ -8,33 +8,27 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Файл для хранения рейсов (чтобы не пропадали при перезагрузке)
 const DATA_FILE = path.join(__dirname, 'data', 'flights.json');
 
-// Загружаем рейсы из файла
 let flights = [];
 try {
   if (fs.existsSync(DATA_FILE)) {
     flights = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
   }
 } catch (e) {
-  console.log('Не удалось загрузить данные, начинаем с пустого');
+  console.log('Начинаем с пустого');
 }
 
-// Сохраняем рейсы в файл
 function saveFlights() {
   try {
     const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(flights, null, 2));
   } catch (e) {
-    console.log('Не удалось сохранить данные:', e.message);
+    console.log('Ошибка сохранения:', e.message);
   }
 }
 
-// Тюменское время (UTC+5)
 const TYUMEN_OFFSET = 5 * 60;
 
 function getTyumenNow() {
@@ -43,14 +37,12 @@ function getTyumenNow() {
   return new Date(utcMinutes + (TYUMEN_OFFSET * 60000));
 }
 
-// Парсим строку как тюменское время
 function parseTyumenDate(dateStr) {
   if (!dateStr) return null;
   const [datePart, timePart] = dateStr.split('T');
   if (!datePart) return null;
   const [year, month, day] = datePart.split('-').map(Number);
   const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
-  // Создаём UTC дату и вычитаем 5 часов
   const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
   return new Date(utcDate.getTime() - (TYUMEN_OFFSET * 60000));
 }
@@ -64,53 +56,59 @@ function formatTyumenTime(date) {
   return `${h}:${m}`;
 }
 
-// Определение статуса — ИСПРАВЛЕННАЯ ЛОГИКА
+// НОВАЯ ЖЕЛЕЗНАЯ ЛОГИКА СТАТУСОВ
 function computeFlightStatus(flight) {
   if (flight.status === 'cancelled') return 'cancelled';
 
-  const now = getTyumenNow();
+  const now = getTyumenNow().getTime();
   
-  const boardingStart = parseTyumenDate(flight.boardingStart);
-  const boardingEnd = parseTyumenDate(flight.boardingEnd);
   const checkInStart = parseTyumenDate(flight.checkInStart);
   const checkInEnd = parseTyumenDate(flight.checkInEnd);
+  const boardingStart = parseTyumenDate(flight.boardingStart);
+  const boardingEnd = parseTyumenDate(flight.boardingEnd);
+  
+  const checkInStartTime = checkInStart ? checkInStart.getTime() : null;
+  const checkInEndTime = checkInEnd ? checkInEnd.getTime() : null;
+  const boardingStartTime = boardingStart ? boardingStart.getTime() : null;
+  const boardingEndTime = boardingEnd ? boardingEnd.getTime() : null;
+
   const schedDep = parseTyumenDate(flight.scheduledDeparture);
   const expectedDep = parseTyumenDate(flight.expectedDeparture);
-
   const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
 
-  // ПРОВЕРЯЕМ В ПРАВИЛЬНОМ ПОРЯДКЕ: от самого позднего к самому раннему
+  // Проверяем статусы СТРОГО по времени: от самого активного к менее активному
   
-  // 1. Посадка закончена: сейчас ПОЗЖЕ окончания посадки
-  if (boardingEnd && now.getTime() > boardingEnd.getTime()) {
+  // 1. Посадка закончена: время окончания посадки ПРОШЛО
+  if (boardingEndTime !== null && now > boardingEndTime) {
     return 'boarding_completed';
   }
   
-  // 2. Идёт посадка: сейчас МЕЖДУ началом и окончанием посадки
-  if (boardingStart && boardingEnd && 
-      now.getTime() >= boardingStart.getTime() && 
-      now.getTime() <= boardingEnd.getTime()) {
+  // 2. Идёт посадка: сейчас МЕЖДУ началом и концом посадки (включая границы)
+  if (boardingStartTime !== null && boardingEndTime !== null && 
+      now >= boardingStartTime && now <= boardingEndTime) {
     return 'boarding';
   }
   
-  // 3. Регистрация закончена: сейчас ПОЗЖЕ конца регистрации, но посадка ещё не началась
-  if (checkInEnd && now.getTime() > checkInEnd.getTime() && 
-      (!boardingStart || now.getTime() < boardingStart.getTime())) {
-    return 'checkin_completed';
+  // 3. Регистрация закончена: время окончания регистрации ПРОШЛО, но посадка ещё не началась
+  if (checkInEndTime !== null && now > checkInEndTime) {
+    // Если посадка ещё не началась — показываем "регистрация закончена"
+    if (!boardingStartTime || now < boardingStartTime) {
+      return 'checkin_completed';
+    }
   }
   
   // 4. Идёт регистрация: сейчас МЕЖДУ началом и концом регистрации
-  if (checkInStart && checkInEnd && 
-      now.getTime() >= checkInStart.getTime() && 
-      now.getTime() <= checkInEnd.getTime()) {
+  if (checkInStartTime !== null && checkInEndTime !== null && 
+      now >= checkInStartTime && now <= checkInEndTime) {
     return 'checkin';
   }
   
   // 5. Задержан
-  if (isDelayed && now.getTime() < expectedDep.getTime()) {
+  if (isDelayed && expectedDep && now < expectedDep.getTime()) {
     return 'delayed';
   }
   
+  // 6. Всё остальное — по расписанию
   return 'scheduled';
 }
 
@@ -124,26 +122,23 @@ function getStatusText(flight) {
   const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
   const delayedTime = expectedDep ? formatTyumenTime(expectedDep) : '';
 
-  let statusText = 'По расписанию';
-
   if (isDelayed) {
     switch (status) {
-      case 'checkin': statusText = `Задержан до ${delayedTime}\nРегистрация`; break;
-      case 'checkin_completed': statusText = `Задержан до ${delayedTime}\nРегистрация закончена`; break;
-      case 'boarding': statusText = `Задержан до ${delayedTime}\nПосадка`; break;
-      case 'boarding_completed': statusText = `Задержан до ${delayedTime}\nПосадка закончена`; break;
-      default: statusText = `Задержан до ${delayedTime}`; break;
+      case 'checkin': return `Задержан до ${delayedTime}\nРегистрация`;
+      case 'checkin_completed': return `Задержан до ${delayedTime}\nРегистрация закончена`;
+      case 'boarding': return `Задержан до ${delayedTime}\nПосадка`;
+      case 'boarding_completed': return `Задержан до ${delayedTime}\nПосадка закончена`;
+      default: return `Задержан до ${delayedTime}`;
     }
   } else {
     switch (status) {
-      case 'checkin': statusText = 'Регистрация'; break;
-      case 'checkin_completed': statusText = 'Регистрация закончена'; break;
-      case 'boarding': statusText = 'Посадка'; break;
-      case 'boarding_completed': statusText = 'Посадка закончена'; break;
-      default: statusText = 'По расписанию'; break;
+      case 'checkin': return 'Регистрация';
+      case 'checkin_completed': return 'Регистрация закончена';
+      case 'boarding': return 'Посадка';
+      case 'boarding_completed': return 'Посадка закончена';
+      default: return 'По расписанию';
     }
   }
-  return statusText;
 }
 
 // API
