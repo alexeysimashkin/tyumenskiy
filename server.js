@@ -7,108 +7,112 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хранилище рейсов
 let flights = [];
 
-// Вспомогательная: получить текущее время в часовом поясе +5 (Тюмень)
+// ВСЕ ДАТЫ ХРАНЯТСЯ И ОБРАБАТЫВАЮТСЯ КАК ТЮМЕНСКОЕ ВРЕМЯ (UTC+5)
+const TYUMEN_OFFSET = 5 * 60; // +5 часов в минутах
+
+// Получить текущее тюменское время
 function getTyumenNow() {
   const now = new Date();
-  // Преобразуем UTC в Тюменское время (UTC+5)
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utc + (5 * 3600000));
+  const utcMinutes = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utcMinutes + (TYUMEN_OFFSET * 60000));
+}
+
+// Парсим дату из строки КАК ТЮМЕНСКОЕ ВРЕМЯ
+// Строка приходит в формате "2025-05-08T15:00:00" — это Тюменское время
+function parseTyumenDate(dateStr) {
+  if (!dateStr) return null;
+  // Разбираем строку вручную, чтобы не было конвертации UTC
+  const [datePart, timePart] = dateStr.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
+  
+  // Создаём дату в UTC, которая соответствует тюменскому времени
+  // Например: 15:00 Тюмень = 10:00 UTC
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
+  // Вычитаем 5 часов, потому что Date.UTC создаёт UTC-время, а нам нужно чтобы 15:00 считалось как 15:00 тюменского
+  const tyumenMs = utcDate.getTime() - (TYUMEN_OFFSET * 60000);
+  return new Date(tyumenMs);
+}
+
+// Форматирование времени для отображения (из тюменской даты)
+function formatTyumenTime(date) {
+  if (!date) return '';
+  // Прибавляем 5 часов к UTC-времени чтобы получить тюменское
+  const tyumenMs = date.getTime() + (TYUMEN_OFFSET * 60000);
+  const d = new Date(tyumenMs);
+  const h = String(d.getUTCHours()).padStart(2, '0');
+  const m = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
 }
 
 // Автоматическое определение статуса
 function computeFlightStatus(flight) {
-  const now = getTyumenNow();
-  
   if (flight.status === 'cancelled') return 'cancelled';
 
-  const schedDep = flight.scheduledDeparture ? new Date(flight.scheduledDeparture) : null;
-  const expectedDep = flight.expectedDeparture ? new Date(flight.expectedDeparture) : null;
-  const checkInStart = flight.checkInStart ? new Date(flight.checkInStart) : null;
-  const checkInEnd = flight.checkInEnd ? new Date(flight.checkInEnd) : null;
-  const boardingStart = flight.boardingStart ? new Date(flight.boardingStart) : null;
-  const boardingEnd = flight.boardingEnd ? new Date(flight.boardingEnd) : null;
-
-  // Если есть ожидаемое время и оно позже расписания — задержка
-  const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
-
-  // Проверяем этапы
-  if (boardingEnd && now > boardingEnd) return 'boarding_completed';
-  if (boardingStart && now >= boardingStart && boardingEnd && now <= boardingEnd) return 'boarding';
-  if (checkInEnd && now > checkInEnd && (!boardingStart || now < boardingStart)) return 'checkin_completed';
-  if (checkInStart && now >= checkInStart && checkInEnd && now <= checkInEnd) return 'checkin';
+  const now = getTyumenNow();
   
-  if (isDelayed && now < expectedDep) return 'delayed';
+  const schedDep = parseTyumenDate(flight.scheduledDeparture);
+  const expectedDep = parseTyumenDate(flight.expectedDeparture);
+  const checkInStart = parseTyumenDate(flight.checkInStart);
+  const checkInEnd = parseTyumenDate(flight.checkInEnd);
+  const boardingStart = parseTyumenDate(flight.boardingStart);
+  const boardingEnd = parseTyumenDate(flight.boardingEnd);
+
+  // Сравниваем getTime() — они все теперь в одной системе (смещённые UTC)
+  if (boardingEnd && now.getTime() >= boardingEnd.getTime()) return 'boarding_completed';
+  if (boardingStart && now.getTime() >= boardingStart.getTime() && boardingEnd && now.getTime() < boardingEnd.getTime()) return 'boarding';
+  if (checkInEnd && now.getTime() >= checkInEnd.getTime() && (!boardingStart || now.getTime() < boardingStart.getTime())) return 'checkin_completed';
+  if (checkInStart && now.getTime() >= checkInStart.getTime() && checkInEnd && now.getTime() < checkInEnd.getTime()) return 'checkin';
+  
+  const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
+  if (isDelayed && now.getTime() < expectedDep.getTime()) return 'delayed';
   
   return 'scheduled';
 }
 
-// Получить человекочитаемый статус
+// Получить текст статуса
 function getStatusText(flight) {
-  const status = computeFlightStatus(flight);
-  
   if (flight.status === 'cancelled') return 'Отменён';
 
-  const expectedDep = flight.expectedDeparture ? new Date(flight.expectedDeparture) : null;
-  const schedDep = flight.scheduledDeparture ? new Date(flight.scheduledDeparture) : null;
+  const status = computeFlightStatus(flight);
+  
+  const expectedDep = parseTyumenDate(flight.expectedDeparture);
+  const schedDep = parseTyumenDate(flight.scheduledDeparture);
   const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
 
-  const delayedTime = expectedDep ? expectedDep.toLocaleTimeString('ru-RU', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    timeZone: 'Asia/Yekaterinburg'
-  }) : '';
+  const delayedTime = expectedDep ? formatTyumenTime(expectedDep) : '';
 
   let statusText = 'По расписанию';
 
   if (isDelayed) {
     switch (status) {
-      case 'checkin': 
-        statusText = `Задержан до ${delayedTime}\nРегистрация`; 
-        break;
-      case 'checkin_completed': 
-        statusText = `Задержан до ${delayedTime}\nРегистрация закончена`; 
-        break;
-      case 'boarding': 
-        statusText = `Задержан до ${delayedTime}\nПосадка`; 
-        break;
-      case 'boarding_completed': 
-        statusText = `Задержан до ${delayedTime}\nПосадка закончена`; 
-        break;
-      default: 
-        statusText = `Задержан до ${delayedTime}`; 
-        break;
+      case 'checkin': statusText = `Задержан до ${delayedTime}\nРегистрация`; break;
+      case 'checkin_completed': statusText = `Задержан до ${delayedTime}\nРегистрация закончена`; break;
+      case 'boarding': statusText = `Задержан до ${delayedTime}\nПосадка`; break;
+      case 'boarding_completed': statusText = `Задержан до ${delayedTime}\nПосадка закончена`; break;
+      default: statusText = `Задержан до ${delayedTime}`; break;
     }
   } else {
     switch (status) {
-      case 'checkin': 
-        statusText = 'Регистрация'; 
-        break;
-      case 'checkin_completed': 
-        statusText = 'Регистрация закончена'; 
-        break;
-      case 'boarding': 
-        statusText = 'Посадка'; 
-        break;
-      case 'boarding_completed': 
-        statusText = 'Посадка закончена'; 
-        break;
-      default: 
-        statusText = 'По расписанию'; 
-        break;
+      case 'checkin': statusText = 'Регистрация'; break;
+      case 'checkin_completed': statusText = 'Регистрация закончена'; break;
+      case 'boarding': statusText = 'Посадка'; break;
+      case 'boarding_completed': statusText = 'Посадка закончена'; break;
+      default: statusText = 'По расписанию'; break;
     }
   }
   return statusText;
 }
 
-// API маршруты
+// API
 app.get('/api/flights', (req, res) => {
   const sorted = [...flights].sort((a, b) => {
-    const timeA = a.expectedDeparture ? new Date(a.expectedDeparture) : new Date(a.scheduledDeparture);
-    const timeB = b.expectedDeparture ? new Date(b.expectedDeparture) : new Date(b.scheduledDeparture);
-    return timeA - timeB;
+    const timeA = parseTyumenDate(a.expectedDeparture || a.scheduledDeparture);
+    const timeB = parseTyumenDate(b.expectedDeparture || b.scheduledDeparture);
+    if (!timeA || !timeB) return 0;
+    return timeA.getTime() - timeB.getTime();
   });
   
   const enriched = sorted.map(f => ({
@@ -154,7 +158,6 @@ app.delete('/api/flights/:id', (req, res) => {
   res.status(204).send();
 });
 
-// Отдаём index.html для всех остальных маршрутов
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
