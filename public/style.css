@@ -381,43 +381,74 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 .extra-label { font-size: 12px; color: var(--gray-400); }
 .extra-value { font-size: 13px; font-weight: 600; color: var(--gray-800); }
 
-/* MOBILE */
+/* ========== МОБИЛЬНАЯ АДАПТАЦИЯ ========== */
 @media (max-width: 768px) {
-  .app { padding: 8px 8px 30px; }
-  .header { padding: 12px 14px; border-radius: 12px; }
-  .header-inner { gap: 8px; }
-  .header-left { gap: 8px; }
-  .logo { width: 36px; height: 36px; border-radius: 10px; font-size: 16px; }
-  .header-info h1 { font-size: 14px; }
-  .header-sub { font-size: 9px; }
-  .iata-badge { font-size: 16px; padding: 5px 12px; letter-spacing: 2px; }
-  .live-clock { font-size: 18px; gap: 6px; }
-  .hide-mobile { display: none; }
-  .admin-btn { padding: 8px 12px; font-size: 11px; }
+  .app { padding: 10px 10px 30px; }
   
-  .form-grid { grid-template-columns: 1fr 1fr; }
+  .header { padding: 14px 16px; border-radius: 14px; }
+  .header-inner { gap: 10px; }
+  .header-left { gap: 10px; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; font-size: 18px; }
+  .header-info h1 { font-size: 15px; }
+  .header-sub { font-size: 10px; }
+  .iata-badge { font-size: 17px; padding: 6px 14px; letter-spacing: 3px; }
+  .live-clock { font-size: 20px; gap: 8px; }
+  .admin-btn { padding: 9px 14px; font-size: 12px; }
+  
+  .form-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field input, .field select { padding: 10px 12px; font-size: 14px; }
+  .field label { font-size: 10px; }
+  
   .admin-row { flex-direction: column; align-items: flex-start; }
   .admin-row-actions { align-self: flex-end; }
   
-  .tabs-bar { flex-wrap: wrap; gap: 6px; }
-  .tab-btn { padding: 8px 14px; font-size: 11px; }
+  .tabs-bar { flex-wrap: wrap; gap: 8px; }
+  .tab-btn { padding: 10px 18px; font-size: 13px; }
   .departed-toggle { margin-left: 0; width: 100%; }
-  .btn-departed { width: 100%; justify-content: center; }
+  .btn-departed { width: 100%; justify-content: center; padding: 12px; font-size: 13px; }
   
-  .board-top { padding: 10px 14px; }
-  .board-top-left h2 { font-size: 13px; }
-  th, td { padding: 10px 6px; font-size: 11px; }
-  th { font-size: 8px; letter-spacing: 0.5px; }
+  .board-top { padding: 12px 16px; }
+  .board-top-left h2 { font-size: 14px; }
   
-  .modal-fs-table-row { grid-template-columns: 1fr 1fr 1fr; font-size: 11px; }
-  .modal-fs-destination h2 { font-size: 22px; }
-  .modal-flight-num { font-size: 20px; }
+  th { padding: 12px 8px; font-size: 10px; letter-spacing: 0.5px; }
+  td { padding: 14px 8px; font-size: 13px; }
+  
+  .modal-fs-table-row { grid-template-columns: 1fr 1fr 1fr; font-size: 12px; }
+  .modal-fs-destination h2 { font-size: 24px; }
+  .modal-flight-num { font-size: 22px; }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 480px) {
+  .app { padding: 8px 6px 24px; }
+  
+  .header { padding: 12px 14px; border-radius: 12px; }
+  .header-inner { gap: 8px; }
+  .logo { width: 38px; height: 38px; font-size: 16px; }
+  .header-info h1 { font-size: 14px; }
+  .iata-badge { font-size: 16px; padding: 5px 12px; }
+  .live-clock { font-size: 18px; }
+  
   .form-grid { grid-template-columns: 1fr; }
-  .header-center { display: none; }
-  th, td { padding: 8px 4px; font-size: 10px; }
-  .dest-iata { font-size: 9px; padding: 1px 4px; }
-  .status-tag { font-size: 9px; padding: 4px 8px; }
+  
+  .admin { padding: 12px 14px; }
+  .form-card { padding: 14px 14px; }
+  
+  .tab-btn { padding: 10px 14px; font-size: 12px; flex: 1; text-align: center; }
+  .tab-btn:first-child { border-radius: 10px 0 0 10px; }
+  .tab-btn:last-child { border-radius: 0 10px 10px 0; }
+  
+  th { padding: 10px 6px; font-size: 9px; }
+  td { padding: 12px 6px; font-size: 12px; }
+  
+  .dest-iata { font-size: 10px; padding: 2px 5px; }
+  .status-tag { font-size: 10px; padding: 4px 10px; }
+  .airline-avatar { width: 24px; height: 24px; font-size: 9px; }
+  
+  .modal { max-height: 90vh; border-radius: 16px; }
+  .modal-head { padding: 14px 16px; }
+  .modal-content { padding: 16px; }
+  .modal-fs-table-row { grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; }
+  .modal-fs-destination h2 { font-size: 22px; }
+  .modal-fs-iata { font-size: 14px; }
+  .timeline-time { font-size: 14px; }
 }
