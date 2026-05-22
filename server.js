@@ -1,203 +1,118 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { Pool } = require('@neondatabase/serverless');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const BOT_TOKEN = '8724795942:AAEHkAv1CC3ZfoF7jOcU3hpTGDsaNaXYbbo';
-const CHANNEL_ID = '-1003879219491';
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-global.flightsCache = global.flightsCache || [];
+pool.query(`CREATE TABLE IF NOT EXISTS flights (id TEXT PRIMARY KEY, data JSONB NOT NULL)`).catch(e => console.log(e));
 
-// Загружаем рейсы из закреплённого сообщения
-async function loadFlights() {
-  try {
-    const res = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/getChat?chat_id=${CHANNEL_ID}`
-    );
-    const data = await res.json();
-    
-    if (data.ok && data.result.pinned_message && data.result.pinned_message.text) {
-      const parsed = JSON.parse(data.result.pinned_message.text);
-      if (Array.isArray(parsed)) {
-        global.flightsCache = parsed;
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.log('Ошибка загрузки:', e.message);
-  }
-  return global.flightsCache;
+async function load() {
+  try { const r = await pool.query('SELECT data FROM flights'); return r.rows.map(x => x.data); }
+  catch(e) { return []; }
 }
 
-// Сохраняем рейсы в закреплённое сообщение
-async function saveFlights(flights) {
-  global.flightsCache = flights;
-  try {
-    const text = JSON.stringify(flights);
-    
-    // Отправляем новое сообщение
-    const sendRes = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: CHANNEL_ID,
-          text: text
-        })
-      }
-    );
-    const sendData = await sendRes.json();
-    
-    if (sendData.ok) {
-      // Закрепляем его
-      await fetch(
-        `https://api.telegram.org/bot${BOT_TOKEN}/pinChatMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: CHANNEL_ID,
-            message_id: sendData.result.message_id,
-            disable_notification: true
-          })
-        }
-      );
-    }
-  } catch (e) {
-    console.log('Ошибка сохранения:', e.message);
-  }
+async function saveOne(f) {
+  await pool.query(
+    'INSERT INTO flights (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2',
+    [f.id, JSON.stringify(f)]
+  );
 }
 
-// Тюменское время
-function getTyumenNow() {
+function getLocalNow() {
   const now = new Date();
-  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utcMs + (5 * 3600000));
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc + (5 * 3600000));
 }
 
-function parseDate(dateStr) {
-  if (!dateStr) return null;
-  const [datePart, timePart] = dateStr.split('T');
-  const [year, month, day] = datePart.split('-').map(Number);
-  const [hours, minutes] = (timePart || '00:00').split(':').map(Number);
-  return new Date(year, month - 1, day, hours, minutes, 0);
-}
-
-function formatTime(date) {
-  if (!date) return '';
-  const h = String(date.getHours()).padStart(2, '0');
-  const m = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-function isAfter(date1, date2) {
-  if (!date1 || !date2) return false;
-  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
-  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
-  return d1.getTime() > d2.getTime();
-}
-
-function isSameOrAfter(date1, date2) {
-  if (!date1 || !date2) return false;
-  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
-  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
-  return d1.getTime() >= d2.getTime();
-}
-
-function isSameOrBefore(date1, date2) {
-  if (!date1 || !date2) return false;
-  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
-  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
-  return d1.getTime() <= d2.getTime();
-}
-
-function isBefore(date1, date2) {
-  if (!date1 || !date2) return false;
-  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate(), date1.getHours(), date1.getMinutes());
-  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate(), date2.getHours(), date2.getMinutes());
-  return d1.getTime() < d2.getTime();
-}
-
-function computeFlightStatus(flight) {
-  if (flight.status === 'cancelled') return 'cancelled';
-
-  const now = getTyumenNow();
-  const checkInStart = parseDate(flight.checkInStart);
-  const checkInEnd = parseDate(flight.checkInEnd);
-  const boardingStart = parseDate(flight.boardingStart);
-  const boardingEnd = parseDate(flight.boardingEnd);
-  
-  const hasCheckIn = checkInStart && checkInEnd;
-  const hasBoarding = boardingStart && boardingEnd;
-
-  if (hasBoarding && isAfter(now, boardingEnd)) return 'boarding_completed';
-  if (hasBoarding && isSameOrAfter(now, boardingStart) && isSameOrBefore(now, boardingEnd)) return 'boarding';
-  if (hasCheckIn && isAfter(now, checkInEnd)) {
-    if (!hasBoarding || isBefore(now, boardingStart)) return 'checkin_completed';
-  }
-  if (hasCheckIn && isSameOrAfter(now, checkInStart) && isSameOrBefore(now, checkInEnd)) return 'checkin';
-
-  const schedDep = parseDate(flight.scheduledDeparture);
-  const expectedDep = parseDate(flight.expectedDeparture);
-  if (expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime() && isBefore(now, expectedDep)) return 'delayed';
-
+function computeStatus(f) {
+  if (f.status === 'cancelled') return 'cancelled';
+  if (f.status === 'departed') return 'departed';
+  const now = getLocalNow();
+  const ci = f.checkInStart ? new Date(f.checkInStart) : null;
+  const ce = f.checkInEnd ? new Date(f.checkInEnd) : null;
+  const bs = f.boardingStart ? new Date(f.boardingStart) : null;
+  const be = f.boardingEnd ? new Date(f.boardingEnd) : null;
+  if (be && now > be) return 'boarding_completed';
+  if (bs && be && now >= bs && now <= be) return 'boarding';
+  if (ce && now > ce && (!bs || now < bs)) return 'checkin_completed';
+  if (ci && ce && now >= ci && now <= ce) return 'checkin';
+  const sched = f.scheduledDeparture ? new Date(f.scheduledDeparture) : null;
+  const exp = f.expectedDeparture ? new Date(f.expectedDeparture) : null;
+  if (exp && sched && exp > sched && now < exp) return 'delayed';
   return 'scheduled';
 }
 
-function getStatusText(flight) {
-  if (flight.status === 'cancelled') return 'Отменён';
-
-  const status = computeFlightStatus(flight);
-  const expectedDep = parseDate(flight.expectedDeparture);
-  const schedDep = parseDate(flight.scheduledDeparture);
-  const isDelayed = expectedDep && schedDep && expectedDep.getTime() > schedDep.getTime();
-  const delayedTime = expectedDep ? formatTime(expectedDep) : '';
-
-  if (isDelayed) {
-    switch (status) {
-      case 'checkin': return `Задержан до ${delayedTime}\nРегистрация`;
-      case 'checkin_completed': return `Задержан до ${delayedTime}\nРегистрация закончена`;
-      case 'boarding': return `Задержан до ${delayedTime}\nПосадка`;
-      case 'boarding_completed': return `Задержан до ${delayedTime}\nПосадка закончена`;
-      default: return `Задержан до ${delayedTime}`;
-    }
-  } else {
-    switch (status) {
-      case 'checkin': return 'Регистрация';
-      case 'checkin_completed': return 'Регистрация закончена';
-      case 'boarding': return 'Посадка';
-      case 'boarding_completed': return 'Посадка закончена';
-      default: return 'По расписанию';
-    }
-  }
+function getStatusText(f) {
+  if (f.status === 'cancelled') return 'Отменён';
+  if (f.status === 'departed') return 'Вылетел';
+  const s = computeStatus(f);
+  const exp = f.expectedDeparture ? new Date(f.expectedDeparture) : null;
+  const time = exp ? `${String(exp.getHours()).padStart(2,'0')}:${String(exp.getMinutes()).padStart(2,'0')}` : '';
+  if (s === 'delayed') return `Задержан до ${time}`;
+  if (s === 'checkin') return 'Регистрация';
+  if (s === 'checkin_completed') return 'Регистрация закончена';
+  if (s === 'boarding') return 'Посадка';
+  if (s === 'boarding_completed') return 'Посадка закончена';
+  return 'По расписанию';
 }
 
-// API
+function getFlightDay(f) {
+  const dep = f.expectedDeparture 
+    ? new Date(f.expectedDeparture) 
+    : f.scheduledDeparture 
+      ? new Date(f.scheduledDeparture) 
+      : null;
+  if (!dep || isNaN(dep.getTime())) return 'today';
+  const now = getLocalNow();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const tomorrowStart = new Date(todayStart.getTime() + 86400000);
+  if (dep >= tomorrowStart) return 'tomorrow';
+  return 'today';
+}
+
 app.get('/api/flights', async (req, res) => {
-  const flights = await loadFlights();
-  const sorted = [...flights].sort((a, b) => {
-    const timeA = parseDate(a.expectedDeparture || a.scheduledDeparture);
-    const timeB = parseDate(b.expectedDeparture || b.scheduledDeparture);
-    if (!timeA || !timeB) return 0;
-    return timeA.getTime() - timeB.getTime();
+  let flights = await load();
+  const showDep = req.query.showDeparted === 'true';
+  const today = getLocalNow().toISOString().slice(0, 10);
+  
+  // Очистка вчерашних departed
+  const cleaned = flights.filter(f => {
+    if (f.status === 'departed' && f.scheduledDeparture) return f.scheduledDeparture.slice(0, 10) >= today;
+    return true;
+  });
+  if (cleaned.length !== flights.length) {
+    for (const f of flights) {
+      if (!cleaned.includes(f)) await pool.query('DELETE FROM flights WHERE id = $1', [f.id]);
+    }
+    flights = cleaned;
+  }
+  
+  if (!showDep) flights = flights.filter(f => f.status !== 'departed');
+  
+  flights = flights.map(f => ({ 
+    ...f, 
+    computedStatus: computeStatus(f), 
+    statusText: getStatusText(f),
+    flightDay: getFlightDay(f)
+  }));
+  
+  flights.sort((a, b) => {
+    const ta = a.expectedDeparture || a.scheduledDeparture || '';
+    const tb = b.expectedDeparture || b.scheduledDeparture || '';
+    return ta.localeCompare(tb);
   });
   
-  const enriched = sorted.map(f => ({
-    ...f,
-    computedStatus: computeFlightStatus(f),
-    statusText: getStatusText(f)
-  }));
-  res.json(enriched);
+  res.json(flights);
 });
 
 app.post('/api/flights', async (req, res) => {
-  let flights = await loadFlights();
-  const flight = {
+  const f = {
     id: Date.now().toString(),
     flightNumber: req.body.flightNumber || '',
     destination: req.body.destination || '',
@@ -213,35 +128,26 @@ app.post('/api/flights', async (req, res) => {
     boardingGate: req.body.boardingGate || '',
     status: req.body.status || 'scheduled'
   };
-  flights.push(flight);
-  await saveFlights(flights);
-  res.status(201).json(flight);
+  await saveOne(f);
+  res.status(201).json(f);
 });
 
 app.put('/api/flights/:id', async (req, res) => {
-  let flights = await loadFlights();
-  const index = flights.findIndex(f => f.id === req.params.id);
-  if (index === -1) return res.status(404).json({ error: 'Рейс не найден' });
-  
-  flights[index] = { ...flights[index], ...req.body, id: flights[index].id };
-  await saveFlights(flights);
-  res.json(flights[index]);
+  const flights = await load();
+  const i = flights.findIndex(f => f.id === req.params.id);
+  if (i === -1) return res.status(404).json({ error: 'Не найден' });
+  flights[i] = { ...flights[i], ...req.body, id: flights[i].id };
+  await saveOne(flights[i]);
+  res.json(flights[i]);
 });
 
 app.delete('/api/flights/:id', async (req, res) => {
-  let flights = await loadFlights();
-  flights = flights.filter(f => f.id !== req.params.id);
-  await saveFlights(flights);
+  await pool.query('DELETE FROM flights WHERE id = $1', [req.params.id]);
   res.status(204).send();
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Сервер на порту ${PORT}`);
-});
-
+app.listen(PORT, () => console.log('Тюмень OK'));
 module.exports = app;
