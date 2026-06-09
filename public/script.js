@@ -1,24 +1,16 @@
-let currentFlights = [];
+let currentMode = 'departure';
 let editingId = null;
-let currentTab = 'today';
-let showDeparted = false;
+let showDepartedDep = false;
+let showDepartedArr = false;
+let currentTabDep = 'today';
+let currentTabArr = 'today';
+let flightsDep = [];
+let flightsArr = [];
 const API = '/api/flights';
 
 const $ = id => document.getElementById(id);
-const clockTime = $('clockTime');
-const lastUpdated = $('lastUpdated');
-const lastUpdated2 = $('lastUpdated2');
-const flightsToday = $('flightsToday');
-const flightsTomorrow = $('flightsTomorrow');
-const adminPanel = $('adminPanel');
-const flightForm = $('flightForm');
-const formTitle = $('formTitle');
-const adminList = $('adminFlightsList');
-const modalOverlay = $('modalOverlay');
-const modalBody = $('modalBody');
-const modalTitle = $('modalTitle');
-const toggleDeparted = $('toggleDeparted');
 
+const clockTime = $('clockTime');
 const LOCAL_OFFSET = 5 * 60;
 function getLocalNow() {
   const now = new Date();
@@ -50,21 +42,37 @@ function fmtDateOnly(s) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-async function load() {
+// Переключение режимов
+document.querySelectorAll('.main-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    $('modeDeparture').style.display = currentMode === 'departure' ? '' : 'none';
+    $('modeArrival').style.display = currentMode === 'arrival' ? '' : 'none';
+    if (currentMode === 'departure') loadDep();
+    else loadArr();
+  });
+});
+
+// ============ ВЫЛЕТ ============
+async function loadDep() {
   try {
-    const r = await fetch(`${API}?showDeparted=${showDeparted}`);
-    currentFlights = await r.json();
-    renderAll();
+    const r = await fetch(`${API}?type=departure&showDeparted=${showDepartedDep}`);
+    flightsDep = await r.json();
+    renderAllDep();
     const now = getLocalNow();
     const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-    if (lastUpdated) lastUpdated.textContent = ts;
-    if (lastUpdated2) lastUpdated2.textContent = ts;
-  } catch(e) { console.log('Ошибка загрузки:', e); }
+    if ($('lastUpdatedDep')) $('lastUpdatedDep').textContent = ts;
+    if ($('lastUpdatedDep2')) $('lastUpdatedDep2').textContent = ts;
+  } catch(e) { console.log(e); }
 }
 
 function getTagClass(f) {
   if (f.status === 'cancelled') return 'tag-cancel';
-  if (f.status === 'departed') return 'tag-departed';
+  if (f.status === 'departed' || f.status === 'early_departed') return 'tag-departed';
+  if (f.status === 'suspended') return 'tag-suspended';
+  if (f.computedStatus === 'early') return 'tag-early';
   if (f.computedStatus === 'checkin') return 'tag-checkin';
   if (f.computedStatus === 'checkin_completed') return 'tag-checkin-end';
   if (f.computedStatus === 'boarding') return 'tag-boarding';
@@ -75,36 +83,37 @@ function getTagClass(f) {
 
 function renderFlightRow(f) {
   const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
-  const departed = f.status === 'departed';
+  const early = f.computedStatus === 'early';
+  const departed = f.status === 'departed' || f.status === 'early_departed';
   const cancelled = f.status === 'cancelled';
   
   let timeHtml;
   if (cancelled || departed) {
     timeHtml = `<span class="time-old">${fmtTm(f.scheduledDeparture)}</span>`;
-  } else if (delayed) {
+  } else if (delayed || early) {
     timeHtml = `<span class="time-old">${fmtTm(f.scheduledDeparture)}</span><br><span class="time-new">${fmtTm(f.expectedDeparture)}</span>`;
   } else {
     timeHtml = fmtTm(f.scheduledDeparture);
   }
   
-  return `<tr onclick="showDetail('${f.id}')" style="${departed ? 'opacity:0.6;' : ''}">
+  return `<tr onclick="showDetail('${f.id}', 'departure')" style="${departed ? 'opacity:0.6;' : ''}">
     <td class="time-cell">${timeHtml}</td>
     <td><div class="dest-cell"><span class="dest-name">${f.destination}</span><span class="dest-iata">${f.iataCode || ''}</span></div></td>
     <td class="flight-num">${f.flightNumber}</td>
     <td><div class="airline-cell"><div class="airline-avatar">${(f.airline || 'A').charAt(0)}</div>${f.airline || ''}</div></td>
-    <td class="gate-cell">${f.boardingGate || '—'}</td>
+    <td><span class="gate-cell">${f.boardingGate || '—'}</span></td>
     <td><span class="status-tag ${getTagClass(f)}">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span></td>
   </tr>`;
 }
 
-function renderAll() {
-  const adminFlights = showDeparted ? currentFlights : currentFlights.filter(f => f.status !== 'departed');
+function renderAllDep() {
+  const adminFlights = showDepartedDep ? flightsDep : flightsDep.filter(f => f.status !== 'departed' && f.status !== 'early_departed');
   
-  if (adminList) {
+  if ($('adminFlightsListDep')) {
     if (!adminFlights.length) {
-      adminList.innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>';
+      $('adminFlightsListDep').innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>';
     } else {
-      adminList.innerHTML = adminFlights.map(f => `
+      $('adminFlightsListDep').innerHTML = adminFlights.map(f => `
         <div class="admin-row">
           <div class="admin-row-info">
             <span class="admin-row-number">${f.flightNumber}</span>
@@ -112,201 +121,389 @@ function renderAll() {
             <span class="status-tag ${getTagClass(f)}" style="font-size:10px;">${(f.statusText || '').replace(/\n/g,' ')}</span>
           </div>
           <div class="admin-row-actions">
-            <button class="btn-icon" onclick="event.stopPropagation();editFlight('${f.id}')"><i class="fas fa-pen"></i></button>
-            <button class="btn-icon danger" onclick="event.stopPropagation();deleteFlight('${f.id}')"><i class="fas fa-trash"></i></button>
+            <button class="btn-icon" onclick="event.stopPropagation();editFlightDep('${f.id}')"><i class="fas fa-pen"></i></button>
+            <button class="btn-icon danger" onclick="event.stopPropagation();deleteFlightDep('${f.id}')"><i class="fas fa-trash"></i></button>
           </div>
         </div>
       `).join('');
     }
   }
   
-  const todayFlights = currentFlights.filter(f => {
-    if (f.status === 'departed') return showDeparted;
+  const todayFlights = flightsDep.filter(f => {
+    if (f.status === 'departed' || f.status === 'early_departed') return showDepartedDep;
     const day = f.flightDay || 'today';
     return day === 'today';
   });
   
-  if (flightsToday) {
-    flightsToday.innerHTML = todayFlights.length === 0
+  if ($('flightsTodayDep')) {
+    $('flightsTodayDep').innerHTML = todayFlights.length === 0
       ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane"></i><p>Нет рейсов на сегодня</p></div></td></tr>`
       : todayFlights.map(renderFlightRow).join('');
   }
   
-  const tomorrowFlights = currentFlights.filter(f => {
-    if (f.status === 'departed') return false;
+  const tomorrowFlights = flightsDep.filter(f => {
+    if (f.status === 'departed' || f.status === 'early_departed') return false;
     const day = f.flightDay || 'today';
     return day === 'tomorrow';
   });
   
-  if (flightsTomorrow) {
-    flightsTomorrow.innerHTML = tomorrowFlights.length === 0
+  if ($('flightsTomorrowDep')) {
+    $('flightsTomorrowDep').innerHTML = tomorrowFlights.length === 0
       ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane"></i><p>Нет рейсов на завтра</p></div></td></tr>`
       : tomorrowFlights.map(renderFlightRow).join('');
   }
 }
 
-window.showDetail = function(id) {
-  const f = currentFlights.find(x => x.id === id);
+// ============ ПРИЛЁТ ============
+async function loadArr() {
+  try {
+    const r = await fetch(`${API}?type=arrival&showDeparted=${showDepartedArr}`);
+    flightsArr = await r.json();
+    renderAllArr();
+    const now = getLocalNow();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    if ($('lastUpdatedArr')) $('lastUpdatedArr').textContent = ts;
+    if ($('lastUpdatedArr2')) $('lastUpdatedArr2').textContent = ts;
+  } catch(e) { console.log(e); }
+}
+
+function getTagClassArr(f) {
+  if (f.status === 'cancelled') return 'tag-cancel';
+  if (f.status === 'arrived') return 'tag-departed';
+  if (f.status === 'diverted') return 'tag-diverted';
+  if (f.status === 'suspended') return 'tag-suspended';
+  if (f.status === 'expected') return 'tag-ok';
+  if (f.status === 'delayed') return 'tag-delay';
+  if (f.status === 'early') return 'tag-early';
+  return 'tag-ok';
+}
+
+function renderFlightRowArr(f) {
+  const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
+  const early = f.status === 'early';
+  const arrived = f.status === 'arrived';
+  const cancelled = f.status === 'cancelled';
+  
+  let timeHtml;
+  if (cancelled || arrived) {
+    timeHtml = `<span class="time-old">${fmtTm(f.scheduledDeparture)}</span>`;
+  } else if (delayed || early) {
+    timeHtml = `<span class="time-old">${fmtTm(f.scheduledDeparture)}</span><br><span class="time-new">${fmtTm(f.expectedDeparture)}</span>`;
+  } else {
+    timeHtml = fmtTm(f.scheduledDeparture);
+  }
+  
+  return `<tr onclick="showDetail('${f.id}', 'arrival')" style="${arrived ? 'opacity:0.6;' : ''}">
+    <td class="time-cell">${timeHtml}</td>
+    <td><div class="dest-cell"><span class="dest-name">${f.destination}</span><span class="dest-iata">${f.iataCode || ''}</span></div></td>
+    <td class="flight-num">${f.flightNumber}</td>
+    <td><div class="airline-cell"><div class="airline-avatar">${(f.airline || 'A').charAt(0)}</div>${f.airline || ''}</div></td>
+    <td><span class="gate-cell">${f.boardingGate || '—'}</span></td>
+    <td><span class="status-tag ${getTagClassArr(f)}">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span></td>
+  </tr>`;
+}
+
+function renderAllArr() {
+  const adminFlights = showDepartedArr ? flightsArr : flightsArr.filter(f => f.status !== 'arrived');
+  
+  if ($('adminFlightsListArr')) {
+    if (!adminFlights.length) {
+      $('adminFlightsListArr').innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>';
+    } else {
+      $('adminFlightsListArr').innerHTML = adminFlights.map(f => `
+        <div class="admin-row">
+          <div class="admin-row-info">
+            <span class="admin-row-number">${f.flightNumber}</span>
+            <span class="admin-row-route">${f.destination} (${f.iataCode || ''})</span>
+            <span class="status-tag ${getTagClassArr(f)}" style="font-size:10px;">${(f.statusText || '').replace(/\n/g,' ')}</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="btn-icon" onclick="event.stopPropagation();editFlightArr('${f.id}')"><i class="fas fa-pen"></i></button>
+            <button class="btn-icon danger" onclick="event.stopPropagation();deleteFlightArr('${f.id}')"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+  
+  const todayFlights = flightsArr.filter(f => {
+    if (f.status === 'arrived') return showDepartedArr;
+    const day = f.flightDay || 'today';
+    return day === 'today';
+  });
+  
+  if ($('flightsTodayArr')) {
+    $('flightsTodayArr').innerHTML = todayFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на сегодня</p></div></td></tr>`
+      : todayFlights.map(renderFlightRowArr).join('');
+  }
+  
+  const tomorrowFlights = flightsArr.filter(f => {
+    if (f.status === 'arrived') return false;
+    const day = f.flightDay || 'today';
+    return day === 'tomorrow';
+  });
+  
+  if ($('flightsTomorrowArr')) {
+    $('flightsTomorrowArr').innerHTML = tomorrowFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на завтра</p></div></td></tr>`
+      : tomorrowFlights.map(renderFlightRowArr).join('');
+  }
+}
+
+// ============ ДЕТАЛИ РЕЙСА ============
+window.showDetail = function(id, type) {
+  const flights = type === 'departure' ? flightsDep : flightsArr;
+  const f = flights.find(x => x.id === id);
   if (!f) return;
   
-  if (modalTitle) modalTitle.textContent = `Рейс ${f.flightNumber}`;
+  $('modalTitle').textContent = `Рейс ${f.flightNumber}`;
   
   const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
-  const delayHtml = delayed ? `<div class="modal-delay-banner"><i class="fas fa-clock"></i><span>Задержан до ${fmtTm(f.expectedDeparture)}</span></div>` : '';
+  const early = f.computedStatus === 'early' || f.status === 'early';
+  const delayHtml = (delayed || early) ? `<div class="modal-delay-banner"><i class="fas fa-clock"></i><span>${early ? 'Ранний вылет' : 'Задержан до ' + fmtTm(f.expectedDeparture)}</span></div>` : '';
   
-  if (modalBody) {
-    modalBody.innerHTML = `
-      <div class="modal-flight-top">
-        <div>
-          <div class="modal-flight-num">${f.flightNumber}</div>
-          <div class="modal-flight-airline">Выполняет: ${f.airline || '—'}</div>
-        </div>
-        <span class="status-tag ${getTagClass(f)}" style="font-size:14px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
-      </div>
-      ${delayHtml}
-      <div class="modal-fs-destination">
-        <h2>${f.destination}</h2>
-        <span class="modal-fs-iata">${f.iataCode || ''}</span>
-      </div>
-      <div class="modal-fs-info-row"><span>Россия</span></div>
-      <div class="modal-fs-table">
-        <div class="modal-fs-table-row header">
-          <div>Дата вылета</div><div>Время по расписанию</div><div>Ожидаемое время</div><div>Выход</div><div>Терминал</div>
-        </div>
-        <div class="modal-fs-table-row">
-          <div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div>
-          <div><strong>${fmtTm(f.scheduledDeparture)}</strong></div>
-          <div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
-          <div><strong>${f.boardingGate || '—'}</strong></div>
-          <div><strong>А</strong></div>
-        </div>
-      </div>
-      <div class="modal-fs-timeline">
-        <h3>Регистрация</h3>
-        <div class="timeline-items">
-          <div class="timeline-item ${['checkin_completed','boarding','boarding_completed','departed'].includes(f.computedStatus) ? 'done' : ''}">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-              <div class="timeline-time">${fmtTm(f.checkInStart)}</div>
-              <div class="timeline-label">Начало регистрации${f.checkInCounters ? ' • Стойки ' + f.checkInCounters : ''}</div>
-            </div>
-          </div>
-          <div class="timeline-item ${['checkin_completed','boarding','boarding_completed','departed'].includes(f.computedStatus) ? 'done' : ''}">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-              <div class="timeline-time">${fmtTm(f.checkInEnd)}</div>
-              <div class="timeline-label">Окончание регистрации</div>
-            </div>
-          </div>
-          ${f.boardingStart ? `
-          <div class="timeline-item ${['boarding','boarding_completed','departed'].includes(f.computedStatus) ? 'active' : ''}">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-              <div class="timeline-time">${fmtTm(f.boardingStart)}</div>
-              <div class="timeline-label">Посадка${f.boardingGate ? ' • Выход ' + f.boardingGate : ''}</div>
-            </div>
-          </div>` : ''}
-        </div>
-      </div>
-      <div class="modal-fs-status">
-        <span class="status-tag ${getTagClass(f)}" style="font-size:15px;padding:10px 24px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
-      </div>
-      <div class="modal-fs-extra">
-        <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
-        <div class="modal-fs-extra-item"><span class="extra-label">Вылет по расписанию</span><span class="extra-value">${fmtDt(f.scheduledDeparture)}</span></div>
-        <div class="modal-fs-extra-item"><span class="extra-label">Ожидаемый вылет</span><span class="extra-value">${fmtDt(f.expectedDeparture)}</span></div>
-        <div class="modal-fs-extra-item"><span class="extra-label">Выход на посадку</span><span class="extra-value">${f.boardingGate || '—'}</span></div>
-      </div>`;
-  }
+  const tagClass = type === 'departure' ? getTagClass(f) : getTagClassArr(f);
   
-  if (modalOverlay) {
-    modalOverlay.classList.add('show');
-    document.body.style.overflow = 'hidden';
-  }
+  const doneCheckIn = ['checkin_completed','boarding','boarding_completed','departed','early_departed'].includes(f.computedStatus);
+  const activeBoarding = ['boarding','boarding_completed'].includes(f.computedStatus);
+  
+  const isDeparture = type === 'departure';
+  
+  $('modalBody').innerHTML = `
+    <div class="modal-flight-top">
+      <div>
+        <div class="modal-flight-num">${f.flightNumber}</div>
+        <div class="modal-flight-airline">${f.airline || '—'}</div>
+      </div>
+      <span class="status-tag ${tagClass}" style="font-size:14px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
+    </div>
+    ${delayHtml}
+    <div class="modal-fs-destination">
+      <h2>${f.destination}</h2>
+      <span class="modal-fs-iata">${f.iataCode || ''}</span>
+    </div>
+    <div class="modal-fs-info-row"><span>Россия</span></div>
+    <div class="modal-fs-table">
+      <div class="modal-fs-table-row header">
+        <div>Дата</div><div>Время по расписанию</div><div>Ожидаемое время</div><div>Выход</div><div>Терминал</div>
+      </div>
+      <div class="modal-fs-table-row">
+        <div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div>
+        <div><strong>${fmtTm(f.scheduledDeparture)}</strong></div>
+        <div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
+        <div><strong>${f.boardingGate || '—'}</strong></div>
+        <div><strong>А</strong></div>
+      </div>
+    </div>
+    ${isDeparture ? `
+    <div class="modal-fs-timeline">
+      <h3>Регистрация и посадка</h3>
+      <div class="timeline-items">
+        <div class="timeline-item ${doneCheckIn ? 'done' : ''}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.checkInStart)}</div>
+            <div class="timeline-label">Начало регистрации${f.checkInCounters ? ' • Стойки ' + f.checkInCounters : ''}</div>
+          </div>
+        </div>
+        <div class="timeline-item ${doneCheckIn ? 'done' : ''}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.checkInEnd)}</div>
+            <div class="timeline-label">Окончание регистрации</div>
+          </div>
+        </div>
+        ${f.boardingStart ? `
+        <div class="timeline-item ${activeBoarding ? 'active' : ''}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.boardingStart)}</div>
+            <div class="timeline-label">Начало посадки${f.boardingGate ? ' • Выход ' + f.boardingGate : ''}</div>
+          </div>
+        </div>
+        ${f.boardingEnd ? `
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.boardingEnd)}</div>
+            <div class="timeline-label">Окончание посадки</div>
+          </div>
+        </div>` : ''}` : ''}
+      </div>
+    </div>` : ''}
+    <div class="modal-fs-status">
+      <span class="status-tag ${tagClass}" style="font-size:15px;padding:10px 24px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
+    </div>
+    <div class="modal-fs-extra">
+      <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
+      <div class="modal-fs-extra-item"><span class="extra-label">По расписанию</span><span class="extra-value">${fmtDt(f.scheduledDeparture)}</span></div>
+      <div class="modal-fs-extra-item"><span class="extra-label">Ожидаемое</span><span class="extra-value">${fmtDt(f.expectedDeparture)}</span></div>
+      ${isDeparture ? `
+      <div class="modal-fs-extra-item"><span class="extra-label">Регистрация</span><span class="extra-value">${fmtTm(f.checkInStart)} — ${fmtTm(f.checkInEnd)}</span></div>
+      <div class="modal-fs-extra-item"><span class="extra-label">Посадка</span><span class="extra-value">${fmtTm(f.boardingStart)} — ${fmtTm(f.boardingEnd)}</span></div>
+      <div class="modal-fs-extra-item"><span class="extra-label">Стойки</span><span class="extra-value">${f.checkInCounters || '—'}</span></div>
+      ` : ''}
+    </div>`;
+
+  $('modalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
 };
 
-if (modalClose) modalClose.onclick = () => { modalOverlay.classList.remove('show'); document.body.style.overflow = ''; };
-if (modalOverlay) modalOverlay.onclick = e => { if (e.target === modalOverlay) { modalOverlay.classList.remove('show'); document.body.style.overflow = ''; } };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalOverlay) { modalOverlay.classList.remove('show'); document.body.style.overflow = ''; } });
+$('modalClose').onclick = () => { $('modalOverlay').classList.remove('show'); document.body.style.overflow = ''; };
+$('modalOverlay').onclick = e => { if (e.target === $('modalOverlay')) { $('modalOverlay').classList.remove('show'); document.body.style.overflow = ''; } };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('modalOverlay').classList.remove('show'); document.body.style.overflow = ''; } });
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
+// ============ ВКЛАДКИ ============
+document.querySelectorAll('#modeDeparture .tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#modeDeparture .tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentTab = btn.dataset.tab;
-    const boardToday = $('boardToday');
-    const boardTomorrow = $('boardTomorrow');
-    if (boardToday) boardToday.style.display = currentTab === 'today' ? '' : 'none';
-    if (boardTomorrow) boardTomorrow.style.display = currentTab === 'tomorrow' ? '' : 'none';
+    currentTabDep = btn.dataset.tab;
+    $('boardTodayDep').style.display = currentTabDep === 'today' ? '' : 'none';
+    $('boardTomorrowDep').style.display = currentTabDep === 'tomorrow' ? '' : 'none';
   });
 });
 
-if (toggleDeparted) {
-  toggleDeparted.addEventListener('click', () => {
-    showDeparted = !showDeparted;
-    toggleDeparted.classList.toggle('active', showDeparted);
-    toggleDeparted.innerHTML = showDeparted ? '<i class="fas fa-eye-slash"></i> <span class="hide-mobile">Скрыть вылетевшие</span>' : '<i class="fas fa-eye"></i> <span class="hide-mobile">Показать вылетевшие</span>';
-    load();
+document.querySelectorAll('#modeArrival .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#modeArrival .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTabArr = btn.dataset.tab;
+    $('boardTodayArr').style.display = currentTabArr === 'today' ? '' : 'none';
+    $('boardTomorrowArr').style.display = currentTabArr === 'tomorrow' ? '' : 'none';
   });
-}
+});
 
-if (adminToggle) adminToggle.onclick = () => { adminPanel.style.display = adminPanel.style.display !== 'none' ? 'none' : 'block'; };
-if ($('addFlightBtn')) $('addFlightBtn').onclick = () => { editingId = null; formTitle.textContent = 'Новый рейс'; $('flightFormInner').reset(); $('flightId').value = ''; $('status').value = 'scheduled'; flightForm.style.display = 'block'; };
-if ($('cancelForm')) $('cancelForm').onclick = () => { flightForm.style.display = 'none'; };
+// ============ КНОПКИ ============
+$('toggleDepartedDep').addEventListener('click', () => {
+  showDepartedDep = !showDepartedDep;
+  $('toggleDepartedDep').classList.toggle('active', showDepartedDep);
+  $('toggleDepartedDep').innerHTML = showDepartedDep ? '<i class="fas fa-eye-slash"></i> Скрыть вылетевшие' : '<i class="fas fa-eye"></i> Показать вылетевшие';
+  loadDep();
+});
 
-window.editFlight = function(id) {
-  const f = currentFlights.find(x => x.id === id);
+$('toggleDepartedArr').addEventListener('click', () => {
+  showDepartedArr = !showDepartedArr;
+  $('toggleDepartedArr').classList.toggle('active', showDepartedArr);
+  $('toggleDepartedArr').innerHTML = showDepartedArr ? '<i class="fas fa-eye-slash"></i> Скрыть прибывшие' : '<i class="fas fa-eye"></i> Показать прибывшие';
+  loadArr();
+});
+
+$('adminToggleDep').onclick = () => {
+  const admin = $('adminDeparture');
+  admin.style.display = admin.style.display !== 'none' ? 'none' : 'block';
+};
+
+$('adminToggleArr').onclick = () => {
+  const admin = $('adminArrival');
+  admin.style.display = admin.style.display !== 'none' ? 'none' : 'block';
+};
+
+// ============ ФОРМЫ ВЫЛЕТ ============
+$('addFlightDep').onclick = () => { editingId = null; $('formTitleDep').textContent = 'Новый рейс'; $('flightFormInnerDep').reset(); $('flightIdDep').value = ''; $('statusDep').value = 'scheduled'; $('flightFormDep').style.display = 'block'; };
+$('cancelFormDep').onclick = () => { $('flightFormDep').style.display = 'none'; };
+
+window.editFlightDep = function(id) {
+  const f = flightsDep.find(x => x.id === id);
   if (!f) return;
   editingId = id;
-  formTitle.textContent = 'Редактировать рейс';
-  $('flightId').value = f.id;
-  $('flightNumber').value = f.flightNumber;
-  $('airline').value = f.airline;
-  $('destination').value = f.destination;
-  $('iataCode').value = f.iataCode || '';
-  $('scheduledDeparture').value = f.scheduledDeparture ? f.scheduledDeparture.slice(0, 16) : '';
-  $('expectedDeparture').value = f.expectedDeparture ? f.expectedDeparture.slice(0, 16) : '';
-  $('checkInStart').value = f.checkInStart ? f.checkInStart.slice(0, 16) : '';
-  $('checkInEnd').value = f.checkInEnd ? f.checkInEnd.slice(0, 16) : '';
-  $('checkInCounters').value = f.checkInCounters || '';
-  $('boardingStart').value = f.boardingStart ? f.boardingStart.slice(0, 16) : '';
-  $('boardingEnd').value = f.boardingEnd ? f.boardingEnd.slice(0, 16) : '';
-  $('boardingGate').value = f.boardingGate || '';
-  $('status').value = f.status;
-  flightForm.style.display = 'block';
+  $('formTitleDep').textContent = 'Редактировать рейс';
+  $('flightIdDep').value = f.id;
+  $('flightNumberDep').value = f.flightNumber;
+  $('airlineDep').value = f.airline;
+  $('destinationDep').value = f.destination;
+  $('iataCodeDep').value = f.iataCode || '';
+  $('scheduledDepartureDep').value = f.scheduledDeparture ? f.scheduledDeparture.slice(0, 16) : '';
+  $('expectedDepartureDep').value = f.expectedDeparture ? f.expectedDeparture.slice(0, 16) : '';
+  $('checkInStartDep').value = f.checkInStart ? f.checkInStart.slice(0, 16) : '';
+  $('checkInEndDep').value = f.checkInEnd ? f.checkInEnd.slice(0, 16) : '';
+  $('checkInCountersDep').value = f.checkInCounters || '';
+  $('boardingStartDep').value = f.boardingStart ? f.boardingStart.slice(0, 16) : '';
+  $('boardingEndDep').value = f.boardingEnd ? f.boardingEnd.slice(0, 16) : '';
+  $('boardingGateDep').value = f.boardingGate || '';
+  $('statusDep').value = f.status;
+  $('flightFormDep').style.display = 'block';
 };
 
-window.deleteFlight = async function(id) {
+window.deleteFlightDep = async function(id) {
   if (!confirm('Удалить рейс?')) return;
-  await fetch(`${API}/${id}`, { method:'DELETE' });
-  load();
+  await fetch(`${API}/${id}?type=departure`, { method:'DELETE' });
+  loadDep();
 };
 
-if ($('flightFormInner')) {
-  $('flightFormInner').onsubmit = async function(e) {
-    e.preventDefault();
-    const body = {
-      flightNumber: $('flightNumber').value,
-      airline: $('airline').value,
-      destination: $('destination').value,
-      iataCode: $('iataCode').value.toUpperCase(),
-      scheduledDeparture: $('scheduledDeparture').value ? $('scheduledDeparture').value + ':00' : null,
-      expectedDeparture: $('expectedDeparture').value ? $('expectedDeparture').value + ':00' : null,
-      checkInStart: $('checkInStart').value ? $('checkInStart').value + ':00' : null,
-      checkInEnd: $('checkInEnd').value ? $('checkInEnd').value + ':00' : null,
-      checkInCounters: $('checkInCounters').value,
-      boardingStart: $('boardingStart').value ? $('boardingStart').value + ':00' : null,
-      boardingEnd: $('boardingEnd').value ? $('boardingEnd').value + ':00' : null,
-      boardingGate: $('boardingGate').value,
-      status: $('status').value
-    };
-    const url = editingId ? `${API}/${editingId}` : API;
-    await fetch(url, { method: editingId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    flightForm.style.display = 'none';
-    editingId = null;
-    load();
+$('flightFormInnerDep').onsubmit = async function(e) {
+  e.preventDefault();
+  const body = {
+    flightNumber: $('flightNumberDep').value,
+    airline: $('airlineDep').value,
+    destination: $('destinationDep').value,
+    iataCode: $('iataCodeDep').value.toUpperCase(),
+    scheduledDeparture: $('scheduledDepartureDep').value ? $('scheduledDepartureDep').value + ':00' : null,
+    expectedDeparture: $('expectedDepartureDep').value ? $('expectedDepartureDep').value + ':00' : null,
+    checkInStart: $('checkInStartDep').value ? $('checkInStartDep').value + ':00' : null,
+    checkInEnd: $('checkInEndDep').value ? $('checkInEndDep').value + ':00' : null,
+    checkInCounters: $('checkInCountersDep').value,
+    boardingStart: $('boardingStartDep').value ? $('boardingStartDep').value + ':00' : null,
+    boardingEnd: $('boardingEndDep').value ? $('boardingEndDep').value + ':00' : null,
+    boardingGate: $('boardingGateDep').value,
+    status: $('statusDep').value
   };
-}
+  const url = editingId ? `${API}/${editingId}?type=departure` : `${API}?type=departure`;
+  await fetch(url, { method: editingId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  $('flightFormDep').style.display = 'none';
+  editingId = null;
+  loadDep();
+};
 
-setInterval(load, 30000);
-load();
+// ============ ФОРМЫ ПРИЛЁТ ============
+$('addFlightArr').onclick = () => { editingId = null; $('formTitleArr').textContent = 'Новый рейс'; $('flightFormInnerArr').reset(); $('flightIdArr').value = ''; $('statusArr').value = 'scheduled'; $('flightFormArr').style.display = 'block'; };
+$('cancelFormArr').onclick = () => { $('flightFormArr').style.display = 'none'; };
+
+window.editFlightArr = function(id) {
+  const f = flightsArr.find(x => x.id === id);
+  if (!f) return;
+  editingId = id;
+  $('formTitleArr').textContent = 'Редактировать рейс';
+  $('flightIdArr').value = f.id;
+  $('flightNumberArr').value = f.flightNumber;
+  $('airlineArr').value = f.airline;
+  $('destinationArr').value = f.destination;
+  $('iataCodeArr').value = f.iataCode || '';
+  $('scheduledDepartureArr').value = f.scheduledDeparture ? f.scheduledDeparture.slice(0, 16) : '';
+  $('expectedDepartureArr').value = f.expectedDeparture ? f.expectedDeparture.slice(0, 16) : '';
+  $('statusArr').value = f.status;
+  $('flightFormArr').style.display = 'block';
+};
+
+window.deleteFlightArr = async function(id) {
+  if (!confirm('Удалить рейс?')) return;
+  await fetch(`${API}/${id}?type=arrival`, { method:'DELETE' });
+  loadArr();
+};
+
+$('flightFormInnerArr').onsubmit = async function(e) {
+  e.preventDefault();
+  const body = {
+    flightNumber: $('flightNumberArr').value,
+    airline: $('airlineArr').value,
+    destination: $('destinationArr').value,
+    iataCode: $('iataCodeArr').value.toUpperCase(),
+    scheduledDeparture: $('scheduledDepartureArr').value ? $('scheduledDepartureArr').value + ':00' : null,
+    expectedDeparture: $('expectedDepartureArr').value ? $('expectedDepartureArr').value + ':00' : null,
+    status: $('statusArr').value
+  };
+  const url = editingId ? `${API}/${editingId}?type=arrival` : `${API}?type=arrival`;
+  await fetch(url, { method: editingId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  $('flightFormArr').style.display = 'none';
+  editingId = null;
+  loadArr();
+};
+
+setInterval(() => {
+  if (currentMode === 'departure') loadDep();
+  else loadArr();
+}, 30000);
+
+loadDep();
+loadArr();
