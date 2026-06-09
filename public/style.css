@@ -1,9 +1,8 @@
 :root {
-  --teal: #0D9488;
-  --teal-dark: #0F766E;
-  --teal-light: #2DD4BF;
-  --teal-bg: #CCFBF1;
-  --teal-bg2: #99F6E4;
+  --rose: #E11D8F;
+  --rose-dark: #BE1878;
+  --rose-light: #F472B6;
+  --rose-bg: #FCE7F3;
   --white: #FFFFFF;
   --gray-50: #F8FAFC;
   --gray-100: #F1F5F9;
@@ -17,6 +16,8 @@
   --amber-bg: #FFFBEB;
   --green: #10B981;
   --green-bg: #ECFDF5;
+  --yellow: #FDE047;
+  --yellow-bg: #FEF9C3;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow-md: 0 4px 20px rgba(0,0,0,0.08);
@@ -27,7 +28,7 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: #F0FDFA;
+  background: #FFF0F5;
   color: var(--gray-800);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -50,21 +51,21 @@ body {
 
 .logo {
   width: 42px; height: 42px;
-  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  background: linear-gradient(135deg, var(--rose), var(--rose-dark));
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
   color: white; font-size: 18px;
-  box-shadow: 0 4px 14px rgba(13,148,136,0.3);
+  box-shadow: 0 4px 14px rgba(225,29,143,0.3);
 }
 
 .header-info h1 { font-size: 16px; font-weight: 800; color: var(--gray-800); }
 .header-sub { font-size: 10px; color: var(--gray-400); font-weight: 500; }
 
 .iata-badge {
-  background: linear-gradient(135deg, var(--teal-light), var(--teal));
+  background: linear-gradient(135deg, var(--rose-light), var(--rose));
   color: white; font-weight: 900; font-size: 18px;
   padding: 6px 16px; border-radius: 30px; letter-spacing: 3px;
-  box-shadow: 0 4px 18px rgba(45,212,191,0.3);
+  box-shadow: 0 4px 18px rgba(244,114,182,0.3);
 }
 
 .header-right { display: flex; align-items: center; gap: 12px; }
@@ -81,15 +82,49 @@ body {
 
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.6)} }
 
-.admin-btn {
-  background: var(--gray-50); border: 1px solid var(--gray-200);
-  padding: 8px 14px; border-radius: 25px; cursor: pointer;
-  font-weight: 600; font-size: 12px; color: var(--gray-600);
-  display: flex; align-items: center; gap: 6px; transition: all 0.2s;
-  font-family: 'Inter', sans-serif;
+/* MAIN TABS */
+.main-tabs { display: flex; gap: 0; margin-bottom: 16px; }
+
+.main-tab {
+  flex: 1; background: var(--white); border: 2px solid var(--gray-200);
+  padding: 14px 20px; font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: all 0.2s;
+  font-family: 'Inter', sans-serif; color: var(--gray-600);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
 }
 
-.admin-btn:hover { background: var(--teal-bg); border-color: var(--teal-light); color: var(--teal); }
+.main-tab:first-child { border-radius: 12px 0 0 12px; }
+.main-tab:last-child { border-radius: 0 12px 12px 0; }
+.main-tab.active { background: var(--rose); color: white; border-color: var(--rose); }
+
+/* ADMIN TOGGLE */
+.admin-toggle-btn {
+  width: 100%;
+  background: var(--rose);
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 4px 14px rgba(225,29,143,0.3);
+}
+
+.admin-toggle-btn:hover {
+  background: var(--rose-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(225,29,143,0.4);
+}
+
+.admin-toggle-btn i { font-size: 16px; }
 
 /* ADMIN */
 .admin {
@@ -98,25 +133,25 @@ body {
   box-shadow: var(--shadow-md); border: 1px solid var(--gray-200);
 }
 
-.admin-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.admin-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
 .admin-top h2 { font-size: 16px; font-weight: 700; }
 
 .btn-primary {
-  background: var(--teal); color: white; border: none;
-  padding: 8px 16px; border-radius: 25px; font-weight: 600; font-size: 12px;
+  background: var(--rose); color: white; border: none;
+  padding: 10px 18px; border-radius: 25px; font-weight: 600; font-size: 13px;
   cursor: pointer; display: flex; align-items: center; gap: 6px;
   transition: all 0.2s; font-family: 'Inter', sans-serif;
-  box-shadow: 0 2px 10px rgba(13,148,136,0.25);
+  box-shadow: 0 2px 10px rgba(225,29,143,0.25);
 }
 
-.btn-primary:hover { background: var(--teal-dark); transform: translateY(-1px); }
+.btn-primary:hover { background: var(--rose-dark); transform: translateY(-1px); }
 
 .form-card {
-  background: var(--teal-bg); border: 1px solid rgba(13,148,136,0.15);
+  background: var(--rose-bg); border: 1px solid rgba(225,29,143,0.15);
   border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px;
 }
 
-.form-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--teal-dark); }
+.form-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--rose-dark); }
 
 .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 
@@ -131,15 +166,15 @@ body {
   transition: all 0.2s; background: white;
 }
 
-.field input:focus, .field select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(13,148,136,0.08); }
+.field input:focus, .field select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(225,29,143,0.08); }
 
 .form-actions { display: flex; gap: 8px; margin-top: 14px; }
 
-.btn-save { background: var(--teal); color: white; border: none; padding: 8px 20px; border-radius: 25px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13px; }
-.btn-save:hover { background: var(--teal-dark); }
+.btn-save { background: var(--rose); color: white; border: none; padding: 8px 20px; border-radius: 25px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13px; }
+.btn-save:hover { background: var(--rose-dark); }
 .btn-cancel { background: transparent; border: 1px solid var(--gray-200); padding: 8px 20px; border-radius: 25px; font-weight: 600; cursor: pointer; color: var(--gray-600); font-family: 'Inter', sans-serif; font-size: 13px; }
 
-#adminFlightsList { display: flex; flex-direction: column; gap: 6px; }
+#adminFlightsListDep, #adminFlightsListArr { display: flex; flex-direction: column; gap: 6px; }
 
 .admin-row {
   display: flex; justify-content: space-between; align-items: center;
@@ -148,20 +183,20 @@ body {
   transition: all 0.2s; flex-wrap: wrap; gap: 8px;
 }
 
-.admin-row:hover { background: var(--teal-bg); border-color: rgba(13,148,136,0.25); }
+.admin-row:hover { background: var(--rose-bg); border-color: rgba(225,29,143,0.25); }
 .admin-row-info { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.admin-row-number { font-weight: 800; color: var(--teal); font-size: 14px; }
+.admin-row-number { font-weight: 800; color: var(--rose); font-size: 14px; }
 .admin-row-route { color: var(--gray-600); font-size: 13px; }
 .admin-row-actions { display: flex; gap: 4px; }
 
 .btn-icon {
-  width: 30px; height: 30px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 50%;
   border: 1px solid var(--gray-200); background: white;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: var(--gray-600); transition: all 0.2s; font-size: 12px;
+  color: var(--gray-600); transition: all 0.2s; font-size: 13px;
 }
 
-.btn-icon:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
+.btn-icon:hover { border-color: var(--rose); color: var(--rose); background: var(--rose-bg); }
 .btn-icon.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
 
 /* TABS */
@@ -176,7 +211,7 @@ body {
 
 .tab-btn:first-child { border-radius: 10px 0 0 10px; }
 .tab-btn:last-child { border-radius: 0 10px 10px 0; }
-.tab-btn.active { background: var(--teal); color: white; border-color: var(--teal); }
+.tab-btn.active { background: var(--rose); color: white; border-color: var(--rose); }
 
 .departed-toggle { margin-left: auto; }
 
@@ -188,8 +223,8 @@ body {
   display: flex; align-items: center; gap: 5px;
 }
 
-.btn-departed:hover { background: var(--teal-bg); border-color: var(--teal-light); color: var(--teal); }
-.btn-departed.active { background: var(--teal); color: white; border-color: var(--teal); }
+.btn-departed:hover { background: var(--rose-bg); border-color: var(--rose-light); color: var(--rose); }
+.btn-departed.active { background: var(--rose); color: white; border-color: var(--rose); }
 
 /* BOARD */
 .board {
@@ -200,7 +235,7 @@ body {
 .board-top {
   display: flex; justify-content: space-between; align-items: center;
   padding: 14px 20px;
-  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  background: linear-gradient(135deg, var(--rose), var(--rose-dark));
   color: white;
 }
 
@@ -219,7 +254,7 @@ th {
 }
 
 tbody tr { transition: all 0.2s; cursor: pointer; border-bottom: 1px solid var(--gray-100); }
-tbody tr:hover { background: var(--teal-bg); }
+tbody tr:hover { background: var(--rose-bg); }
 td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-800); white-space: nowrap; }
 
 .time-cell { font-weight: 600; }
@@ -228,19 +263,28 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 
 .dest-cell { display: flex; align-items: center; gap: 6px; }
 .dest-name { font-weight: 600; }
-.dest-iata { background: var(--teal-bg); color: var(--teal); padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+.dest-iata { background: var(--rose-bg); color: var(--rose); padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px; }
 .flight-num { font-weight: 700; }
 
 .airline-cell { display: flex; align-items: center; gap: 6px; }
 .airline-avatar {
   width: 26px; height: 26px;
-  background: linear-gradient(135deg, var(--teal-light), var(--teal));
+  background: linear-gradient(135deg, var(--rose-light), var(--rose));
   border-radius: 6px; display: flex; align-items: center; justify-content: center;
   color: white; font-size: 10px; font-weight: 700;
   flex-shrink: 0;
 }
 
-.gate-cell { font-weight: 700; color: var(--teal); }
+/* GATE — желтый фон, черный текст */
+.gate-cell {
+  font-weight: 700;
+  color: #000;
+  background: var(--yellow-bg);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  border: 1px solid var(--yellow);
+}
 
 /* STATUS */
 .status-tag {
@@ -250,13 +294,16 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 }
 
 .tag-ok { background: var(--green-bg); color: var(--green); }
-.tag-checkin { background: var(--teal-bg); color: var(--teal); }
+.tag-checkin { background: var(--rose-bg); color: var(--rose); }
 .tag-checkin-end { background: var(--amber-bg); color: var(--amber); }
 .tag-boarding { background: var(--red-bg); color: var(--red); animation: blinker 1.2s infinite; }
-.tag-boarding-end { background: var(--teal-bg); color: var(--teal-dark); }
+.tag-boarding-end { background: var(--rose-bg); color: var(--rose-dark); }
 .tag-delay { background: var(--amber-bg); color: var(--amber); }
 .tag-cancel { background: var(--red-bg); color: var(--red); font-weight: 800; }
 .tag-departed { background: var(--gray-100); color: var(--gray-600); }
+.tag-early { background: #E0F2FE; color: #0284C7; }
+.tag-suspended { background: #F1F5F9; color: #64748B; }
+.tag-diverted { background: #FEF3C7; color: #B45309; }
 
 @keyframes blinker { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
@@ -264,6 +311,35 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 .empty-msg { text-align: center; color: var(--gray-400); }
 .empty-msg i { font-size: 32px; margin-bottom: 6px; opacity: 0.3; }
 .empty-msg p { font-size: 14px; font-weight: 500; }
+
+/* REFUND BUTTON */
+.refund-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--white);
+  color: var(--rose);
+  border: 2px solid var(--rose);
+  padding: 14px 22px;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(225,29,143,0.2);
+  transition: all 0.3s;
+  z-index: 99;
+  font-family: 'Inter', sans-serif;
+}
+
+.refund-btn:hover {
+  background: var(--rose);
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(225,29,143,0.35);
+}
 
 /* MODAL */
 .modal-overlay {
@@ -307,7 +383,7 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
   margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--gray-200);
   flex-wrap: wrap; gap: 10px;
 }
-.modal-flight-num { font-size: 24px; font-weight: 900; color: var(--teal); }
+.modal-flight-num { font-size: 24px; font-weight: 900; color: var(--rose); }
 .modal-flight-dest { font-size: 16px; font-weight: 700; margin-top: 2px; }
 .modal-flight-airline { font-size: 13px; color: var(--gray-600); margin-top: 4px; }
 
@@ -321,7 +397,7 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 .modal-fs-destination { margin-bottom: 6px; display: flex; align-items: baseline; gap: 10px; }
 .modal-fs-destination h2 { font-size: 28px; font-weight: 900; color: var(--gray-800); }
 .modal-fs-iata {
-  background: var(--teal-bg); color: var(--teal);
+  background: var(--rose-bg); color: var(--rose);
   padding: 3px 10px; border-radius: 8px; font-weight: 800;
   font-size: 16px; letter-spacing: 2px;
 }
@@ -364,7 +440,7 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
   flex-shrink: 0; z-index: 1; border: 2px solid white;
 }
 
-.timeline-item.done .timeline-dot { background: var(--teal); }
+.timeline-item.done .timeline-dot { background: var(--rose); }
 .timeline-item.active .timeline-dot { background: var(--green); animation: pulse 2s infinite; }
 
 .timeline-content { flex: 1; }
@@ -381,74 +457,18 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 .extra-label { font-size: 12px; color: var(--gray-400); }
 .extra-value { font-size: 13px; font-weight: 600; color: var(--gray-800); }
 
-/* ========== МОБИЛЬНАЯ АДАПТАЦИЯ ========== */
 @media (max-width: 768px) {
-  .app { padding: 10px 10px 30px; }
-  
-  .header { padding: 14px 16px; border-radius: 14px; }
-  .header-inner { gap: 10px; }
-  .header-left { gap: 10px; }
-  .logo { width: 40px; height: 40px; border-radius: 12px; font-size: 18px; }
-  .header-info h1 { font-size: 15px; }
-  .header-sub { font-size: 10px; }
-  .iata-badge { font-size: 17px; padding: 6px 14px; letter-spacing: 3px; }
-  .live-clock { font-size: 20px; gap: 8px; }
-  .admin-btn { padding: 9px 14px; font-size: 12px; }
-  
-  .form-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .field input, .field select { padding: 10px 12px; font-size: 14px; }
-  .field label { font-size: 10px; }
-  
-  .admin-row { flex-direction: column; align-items: flex-start; }
-  .admin-row-actions { align-self: flex-end; }
-  
+  .form-grid { grid-template-columns: 1fr 1fr; }
   .tabs-bar { flex-wrap: wrap; gap: 8px; }
-  .tab-btn { padding: 10px 18px; font-size: 13px; }
   .departed-toggle { margin-left: 0; width: 100%; }
-  .btn-departed { width: 100%; justify-content: center; padding: 12px; font-size: 13px; }
-  
-  .board-top { padding: 12px 16px; }
-  .board-top-left h2 { font-size: 14px; }
-  
-  th { padding: 12px 8px; font-size: 10px; letter-spacing: 0.5px; }
-  td { padding: 14px 8px; font-size: 13px; }
-  
-  .modal-fs-table-row { grid-template-columns: 1fr 1fr 1fr; font-size: 12px; }
-  .modal-fs-destination h2 { font-size: 24px; }
-  .modal-flight-num { font-size: 22px; }
+  .btn-departed { width: 100%; justify-content: center; }
+  .admin-top { flex-direction: column; align-items: flex-start; }
+  .btn-primary { width: 100%; justify-content: center; }
+  .refund-btn { bottom: 10px; right: 10px; padding: 10px 16px; font-size: 12px; }
 }
 
 @media (max-width: 480px) {
-  .app { padding: 8px 6px 24px; }
-  
-  .header { padding: 12px 14px; border-radius: 12px; }
-  .header-inner { gap: 8px; }
-  .logo { width: 38px; height: 38px; font-size: 16px; }
-  .header-info h1 { font-size: 14px; }
-  .iata-badge { font-size: 16px; padding: 5px 12px; }
-  .live-clock { font-size: 18px; }
-  
   .form-grid { grid-template-columns: 1fr; }
-  
-  .admin { padding: 12px 14px; }
-  .form-card { padding: 14px 14px; }
-  
-  .tab-btn { padding: 10px 14px; font-size: 12px; flex: 1; text-align: center; }
-  .tab-btn:first-child { border-radius: 10px 0 0 10px; }
-  .tab-btn:last-child { border-radius: 0 10px 10px 0; }
-  
-  th { padding: 10px 6px; font-size: 9px; }
-  td { padding: 12px 6px; font-size: 12px; }
-  
-  .dest-iata { font-size: 10px; padding: 2px 5px; }
-  .status-tag { font-size: 10px; padding: 4px 10px; }
-  .airline-avatar { width: 24px; height: 24px; font-size: 9px; }
-  
-  .modal { max-height: 90vh; border-radius: 16px; }
-  .modal-head { padding: 14px 16px; }
-  .modal-content { padding: 16px; }
-  .modal-fs-table-row { grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; }
-  .modal-fs-destination h2 { font-size: 22px; }
-  .modal-fs-iata { font-size: 14px; }
-  .timeline-time { font-size: 14px; }
+  .main-tab { font-size: 12px; padding: 12px 14px; }
+  .admin-toggle-btn { font-size: 13px; padding: 12px 16px; }
 }
