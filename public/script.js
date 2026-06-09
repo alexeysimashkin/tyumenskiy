@@ -46,7 +46,6 @@ function getYesterday() { const d = getLocalNow(); d.setDate(d.getDate()-1); ret
 function getToday() { return getLocalNow().toISOString().slice(0,10); }
 function getTomorrow() { const d = getLocalNow(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }
 
-// Переключение режимов
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
@@ -147,7 +146,6 @@ function renderAllDep() {
     }
   }
   
-  // Вчера — показываем ВСЕ рейсы, даже departed
   const yesterdayFlights = flightsDep.filter(f => getFlightDayDate(f) === 'yesterday');
   if ($('flightsYesterdayDep')) {
     $('flightsYesterdayDep').innerHTML = yesterdayFlights.length === 0
@@ -155,7 +153,6 @@ function renderAllDep() {
       : yesterdayFlights.map(f => renderFlightRow(f, true)).join('');
   }
   
-  // Сегодня
   const todayFlights = flightsDep.filter(f => {
     if (f.status === 'departed' || f.status === 'early_departed') return showDepartedDep;
     return getFlightDayDate(f) === 'today';
@@ -166,7 +163,6 @@ function renderAllDep() {
       : todayFlights.map(f => renderFlightRow(f, showDepartedDep)).join('');
   }
   
-  // Завтра
   const tomorrowFlights = flightsDep.filter(f => getFlightDayDate(f) === 'tomorrow');
   if ($('flightsTomorrowDep')) {
     $('flightsTomorrowDep').innerHTML = tomorrowFlights.length === 0
@@ -251,7 +247,6 @@ function renderAllArr() {
     }
   }
   
-  // Вчера
   const yesterdayFlights = flightsArr.filter(f => getFlightDayDate(f) === 'yesterday');
   if ($('flightsYesterdayArr')) {
     $('flightsYesterdayArr').innerHTML = yesterdayFlights.length === 0
@@ -259,7 +254,6 @@ function renderAllArr() {
       : yesterdayFlights.map(f => renderFlightRowArr(f, true)).join('');
   }
   
-  // Сегодня
   const todayFlights = flightsArr.filter(f => {
     if (f.status === 'arrived') return showDepartedArr;
     return getFlightDayDate(f) === 'today';
@@ -270,7 +264,6 @@ function renderAllArr() {
       : todayFlights.map(f => renderFlightRowArr(f, showDepartedArr)).join('');
   }
   
-  // Завтра
   const tomorrowFlights = flightsArr.filter(f => getFlightDayDate(f) === 'tomorrow');
   if ($('flightsTomorrowArr')) {
     $('flightsTomorrowArr').innerHTML = tomorrowFlights.length === 0
@@ -293,12 +286,14 @@ window.showDetail = function(id, type) {
   
   const tagClass = type === 'departure' ? getTagClass(f) : getTagClassArr(f);
   const isDeparture = type === 'departure';
+  const doneCheckIn = ['checkin_completed','boarding','boarding_completed','departed','early_departed'].includes(f.computedStatus);
+  const activeBoarding = ['boarding','boarding_completed'].includes(f.computedStatus);
   
   $('modalBody').innerHTML = `
     <div class="modal-flight-top">
       <div>
         <div class="modal-flight-num">${f.flightNumber}</div>
-        <div class="modal-flight-airline">${f.airline || '—'}</div>
+        <div class="modal-flight-airline">Выполняет: ${f.airline || '—'}</div>
       </div>
       <span class="status-tag ${tagClass}" style="font-size:14px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
     </div>
@@ -307,18 +302,69 @@ window.showDetail = function(id, type) {
       <h2>${f.destination}</h2>
       <span class="modal-fs-iata">${f.iataCode || ''}</span>
     </div>
+    <div class="modal-fs-info-row"><span>Россия</span></div>
     <div class="modal-fs-table">
-      <div class="modal-fs-table-row header"><div>Дата</div><div>По расписанию</div><div>Ожидаемое</div><div>Выход</div><div>Терминал</div></div>
-      <div class="modal-fs-table-row"><div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div><div><strong>${fmtTm(f.scheduledDeparture)}</strong></div><div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div><div><strong>${f.boardingGate || '—'}</strong></div><div><strong>А</strong></div></div>
+      <div class="modal-fs-table-row header">
+        <div>Дата вылета</div><div>Время по расписанию</div><div>Ожидаемое время</div><div>Выход</div><div>Терминал</div>
+      </div>
+      <div class="modal-fs-table-row">
+        <div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div>
+        <div><strong>${fmtTm(f.scheduledDeparture)}</strong></div>
+        <div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
+        <div><strong>${f.boardingGate || '—'}</strong></div>
+        <div><strong>А</strong></div>
+      </div>
     </div>
-    ${isDeparture ? `
+    ${isDeparture && (f.checkInStart || f.checkInEnd || f.boardingStart || f.boardingEnd) ? `
+    <div class="modal-fs-timeline">
+      <h3>Регистрация и посадка</h3>
+      <div class="timeline-items">
+        ${f.checkInStart ? `
+        <div class="timeline-item ${doneCheckIn ? 'done' : ''}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.checkInStart)}</div>
+            <div class="timeline-label">Начало регистрации${f.checkInCounters ? ' • Стойки ' + f.checkInCounters : ''}</div>
+          </div>
+        </div>` : ''}
+        ${f.checkInEnd ? `
+        <div class="timeline-item ${doneCheckIn ? 'done' : ''}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.checkInEnd)}</div>
+            <div class="timeline-label">Окончание регистрации</div>
+          </div>
+        </div>` : ''}
+        ${f.boardingStart ? `
+        <div class="timeline-item ${activeBoarding ? 'active' : ''}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.boardingStart)}</div>
+            <div class="timeline-label">Начало посадки${f.boardingGate ? ' • Выход ' + f.boardingGate : ''}</div>
+          </div>
+        </div>` : ''}
+        ${f.boardingEnd ? `
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-time">${fmtTm(f.boardingEnd)}</div>
+            <div class="timeline-label">Окончание посадки</div>
+          </div>
+        </div>` : ''}
+      </div>
+    </div>` : ''}
+    <div class="modal-fs-status">
+      <span class="status-tag ${tagClass}" style="font-size:15px;padding:10px 24px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
+    </div>
     <div class="modal-fs-extra">
+      <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
+      <div class="modal-fs-extra-item"><span class="extra-label">Вылет по расписанию</span><span class="extra-value">${fmtDt(f.scheduledDeparture)}</span></div>
+      <div class="modal-fs-extra-item"><span class="extra-label">Ожидаемый вылет</span><span class="extra-value">${fmtDt(f.expectedDeparture)}</span></div>
+      ${isDeparture ? `
       <div class="modal-fs-extra-item"><span class="extra-label">Регистрация</span><span class="extra-value">${fmtTm(f.checkInStart)} — ${fmtTm(f.checkInEnd)}</span></div>
       <div class="modal-fs-extra-item"><span class="extra-label">Посадка</span><span class="extra-value">${fmtTm(f.boardingStart)} — ${fmtTm(f.boardingEnd)}</span></div>
       <div class="modal-fs-extra-item"><span class="extra-label">Стойки</span><span class="extra-value">${f.checkInCounters || '—'}</span></div>
-    </div>` : ''}
-    <div class="modal-fs-extra" style="margin-top:12px;">
-      <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
+      ` : ''}
     </div>`;
 
   $('modalOverlay').classList.add('show');
