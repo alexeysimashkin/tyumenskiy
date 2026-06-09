@@ -42,6 +42,10 @@ function fmtDateOnly(s) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
+function getYesterday() { const d = getLocalNow(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+function getToday() { return getLocalNow().toISOString().slice(0,10); }
+function getTomorrow() { const d = getLocalNow(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }
+
 // Переключение режимов
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -58,13 +62,14 @@ document.querySelectorAll('.main-tab').forEach(btn => {
 // ============ ВЫЛЕТ ============
 async function loadDep() {
   try {
-    const r = await fetch(`${API}?type=departure&showDeparted=${showDepartedDep}`);
+    const r = await fetch(`${API}?type=departure&showDeparted=true`);
     flightsDep = await r.json();
     renderAllDep();
     const now = getLocalNow();
     const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
     if ($('lastUpdatedDep')) $('lastUpdatedDep').textContent = ts;
     if ($('lastUpdatedDep2')) $('lastUpdatedDep2').textContent = ts;
+    if ($('lastUpdatedDepY')) $('lastUpdatedDepY').textContent = ts;
   } catch(e) { console.log(e); }
 }
 
@@ -81,7 +86,7 @@ function getTagClass(f) {
   return 'tag-ok';
 }
 
-function renderFlightRow(f) {
+function renderFlightRow(f, showDepartedBtn) {
   const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
   const early = f.computedStatus === 'early';
   const departed = f.status === 'departed' || f.status === 'early_departed';
@@ -96,6 +101,9 @@ function renderFlightRow(f) {
     timeHtml = fmtTm(f.scheduledDeparture);
   }
   
+  const hideDeparted = !showDepartedBtn && departed;
+  if (hideDeparted) return '';
+  
   return `<tr onclick="showDetail('${f.id}', 'departure')" style="${departed ? 'opacity:0.6;' : ''}">
     <td class="time-cell">${timeHtml}</td>
     <td><div class="dest-cell"><span class="dest-name">${f.destination}</span><span class="dest-iata">${f.iataCode || ''}</span></div></td>
@@ -104,6 +112,16 @@ function renderFlightRow(f) {
     <td><span class="gate-cell">${f.boardingGate || '—'}</span></td>
     <td><span class="status-tag ${getTagClass(f)}">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span></td>
   </tr>`;
+}
+
+function getFlightDayDate(f) {
+  const d = f.scheduledDeparture ? new Date(f.scheduledDeparture) : null;
+  if (!d || isNaN(d.getTime())) return 'today';
+  const ds = d.toISOString().slice(0,10);
+  if (ds === getYesterday()) return 'yesterday';
+  if (ds === getToday()) return 'today';
+  if (ds === getTomorrow()) return 'tomorrow';
+  return 'today';
 }
 
 function renderAllDep() {
@@ -129,41 +147,45 @@ function renderAllDep() {
     }
   }
   
+  // Вчера — показываем ВСЕ рейсы, даже departed
+  const yesterdayFlights = flightsDep.filter(f => getFlightDayDate(f) === 'yesterday');
+  if ($('flightsYesterdayDep')) {
+    $('flightsYesterdayDep').innerHTML = yesterdayFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane"></i><p>Нет рейсов за вчера</p></div></td></tr>`
+      : yesterdayFlights.map(f => renderFlightRow(f, true)).join('');
+  }
+  
+  // Сегодня
   const todayFlights = flightsDep.filter(f => {
     if (f.status === 'departed' || f.status === 'early_departed') return showDepartedDep;
-    const day = f.flightDay || 'today';
-    return day === 'today';
+    return getFlightDayDate(f) === 'today';
   });
-  
   if ($('flightsTodayDep')) {
     $('flightsTodayDep').innerHTML = todayFlights.length === 0
       ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane"></i><p>Нет рейсов на сегодня</p></div></td></tr>`
-      : todayFlights.map(renderFlightRow).join('');
+      : todayFlights.map(f => renderFlightRow(f, showDepartedDep)).join('');
   }
   
-  const tomorrowFlights = flightsDep.filter(f => {
-    if (f.status === 'departed' || f.status === 'early_departed') return false;
-    const day = f.flightDay || 'today';
-    return day === 'tomorrow';
-  });
-  
+  // Завтра
+  const tomorrowFlights = flightsDep.filter(f => getFlightDayDate(f) === 'tomorrow');
   if ($('flightsTomorrowDep')) {
     $('flightsTomorrowDep').innerHTML = tomorrowFlights.length === 0
       ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane"></i><p>Нет рейсов на завтра</p></div></td></tr>`
-      : tomorrowFlights.map(renderFlightRow).join('');
+      : tomorrowFlights.map(f => renderFlightRow(f, false)).join('');
   }
 }
 
 // ============ ПРИЛЁТ ============
 async function loadArr() {
   try {
-    const r = await fetch(`${API}?type=arrival&showDeparted=${showDepartedArr}`);
+    const r = await fetch(`${API}?type=arrival&showDeparted=true`);
     flightsArr = await r.json();
     renderAllArr();
     const now = getLocalNow();
     const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
     if ($('lastUpdatedArr')) $('lastUpdatedArr').textContent = ts;
     if ($('lastUpdatedArr2')) $('lastUpdatedArr2').textContent = ts;
+    if ($('lastUpdatedArrY')) $('lastUpdatedArrY').textContent = ts;
   } catch(e) { console.log(e); }
 }
 
@@ -178,7 +200,7 @@ function getTagClassArr(f) {
   return 'tag-ok';
 }
 
-function renderFlightRowArr(f) {
+function renderFlightRowArr(f, showArrived) {
   const delayed = f.expectedDeparture && new Date(f.expectedDeparture) > new Date(f.scheduledDeparture);
   const early = f.status === 'early';
   const arrived = f.status === 'arrived';
@@ -192,6 +214,9 @@ function renderFlightRowArr(f) {
   } else {
     timeHtml = fmtTm(f.scheduledDeparture);
   }
+  
+  const hideArrived = !showArrived && arrived;
+  if (hideArrived) return '';
   
   return `<tr onclick="showDetail('${f.id}', 'arrival')" style="${arrived ? 'opacity:0.6;' : ''}">
     <td class="time-cell">${timeHtml}</td>
@@ -226,28 +251,31 @@ function renderAllArr() {
     }
   }
   
+  // Вчера
+  const yesterdayFlights = flightsArr.filter(f => getFlightDayDate(f) === 'yesterday');
+  if ($('flightsYesterdayArr')) {
+    $('flightsYesterdayArr').innerHTML = yesterdayFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов за вчера</p></div></td></tr>`
+      : yesterdayFlights.map(f => renderFlightRowArr(f, true)).join('');
+  }
+  
+  // Сегодня
   const todayFlights = flightsArr.filter(f => {
     if (f.status === 'arrived') return showDepartedArr;
-    const day = f.flightDay || 'today';
-    return day === 'today';
+    return getFlightDayDate(f) === 'today';
   });
-  
   if ($('flightsTodayArr')) {
     $('flightsTodayArr').innerHTML = todayFlights.length === 0
       ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на сегодня</p></div></td></tr>`
-      : todayFlights.map(renderFlightRowArr).join('');
+      : todayFlights.map(f => renderFlightRowArr(f, showDepartedArr)).join('');
   }
   
-  const tomorrowFlights = flightsArr.filter(f => {
-    if (f.status === 'arrived') return false;
-    const day = f.flightDay || 'today';
-    return day === 'tomorrow';
-  });
-  
+  // Завтра
+  const tomorrowFlights = flightsArr.filter(f => getFlightDayDate(f) === 'tomorrow');
   if ($('flightsTomorrowArr')) {
     $('flightsTomorrowArr').innerHTML = tomorrowFlights.length === 0
       ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на завтра</p></div></td></tr>`
-      : tomorrowFlights.map(renderFlightRowArr).join('');
+      : tomorrowFlights.map(f => renderFlightRowArr(f, false)).join('');
   }
 }
 
@@ -264,10 +292,6 @@ window.showDetail = function(id, type) {
   const delayHtml = (delayed || early) ? `<div class="modal-delay-banner"><i class="fas fa-clock"></i><span>${early ? 'Ранний вылет' : 'Задержан до ' + fmtTm(f.expectedDeparture)}</span></div>` : '';
   
   const tagClass = type === 'departure' ? getTagClass(f) : getTagClassArr(f);
-  
-  const doneCheckIn = ['checkin_completed','boarding','boarding_completed','departed','early_departed'].includes(f.computedStatus);
-  const activeBoarding = ['boarding','boarding_completed'].includes(f.computedStatus);
-  
   const isDeparture = type === 'departure';
   
   $('modalBody').innerHTML = `
@@ -283,67 +307,18 @@ window.showDetail = function(id, type) {
       <h2>${f.destination}</h2>
       <span class="modal-fs-iata">${f.iataCode || ''}</span>
     </div>
-    <div class="modal-fs-info-row"><span>Россия</span></div>
     <div class="modal-fs-table">
-      <div class="modal-fs-table-row header">
-        <div>Дата</div><div>Время по расписанию</div><div>Ожидаемое время</div><div>Выход</div><div>Терминал</div>
-      </div>
-      <div class="modal-fs-table-row">
-        <div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div>
-        <div><strong>${fmtTm(f.scheduledDeparture)}</strong></div>
-        <div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div>
-        <div><strong>${f.boardingGate || '—'}</strong></div>
-        <div><strong>А</strong></div>
-      </div>
+      <div class="modal-fs-table-row header"><div>Дата</div><div>По расписанию</div><div>Ожидаемое</div><div>Выход</div><div>Терминал</div></div>
+      <div class="modal-fs-table-row"><div><strong>${fmtDateOnly(f.scheduledDeparture)}</strong></div><div><strong>${fmtTm(f.scheduledDeparture)}</strong></div><div><strong>${fmtTm(f.expectedDeparture || f.scheduledDeparture)}</strong></div><div><strong>${f.boardingGate || '—'}</strong></div><div><strong>А</strong></div></div>
     </div>
     ${isDeparture ? `
-    <div class="modal-fs-timeline">
-      <h3>Регистрация и посадка</h3>
-      <div class="timeline-items">
-        <div class="timeline-item ${doneCheckIn ? 'done' : ''}">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <div class="timeline-time">${fmtTm(f.checkInStart)}</div>
-            <div class="timeline-label">Начало регистрации${f.checkInCounters ? ' • Стойки ' + f.checkInCounters : ''}</div>
-          </div>
-        </div>
-        <div class="timeline-item ${doneCheckIn ? 'done' : ''}">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <div class="timeline-time">${fmtTm(f.checkInEnd)}</div>
-            <div class="timeline-label">Окончание регистрации</div>
-          </div>
-        </div>
-        ${f.boardingStart ? `
-        <div class="timeline-item ${activeBoarding ? 'active' : ''}">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <div class="timeline-time">${fmtTm(f.boardingStart)}</div>
-            <div class="timeline-label">Начало посадки${f.boardingGate ? ' • Выход ' + f.boardingGate : ''}</div>
-          </div>
-        </div>
-        ${f.boardingEnd ? `
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <div class="timeline-time">${fmtTm(f.boardingEnd)}</div>
-            <div class="timeline-label">Окончание посадки</div>
-          </div>
-        </div>` : ''}` : ''}
-      </div>
-    </div>` : ''}
-    <div class="modal-fs-status">
-      <span class="status-tag ${tagClass}" style="font-size:15px;padding:10px 24px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
-    </div>
     <div class="modal-fs-extra">
-      <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
-      <div class="modal-fs-extra-item"><span class="extra-label">По расписанию</span><span class="extra-value">${fmtDt(f.scheduledDeparture)}</span></div>
-      <div class="modal-fs-extra-item"><span class="extra-label">Ожидаемое</span><span class="extra-value">${fmtDt(f.expectedDeparture)}</span></div>
-      ${isDeparture ? `
       <div class="modal-fs-extra-item"><span class="extra-label">Регистрация</span><span class="extra-value">${fmtTm(f.checkInStart)} — ${fmtTm(f.checkInEnd)}</span></div>
       <div class="modal-fs-extra-item"><span class="extra-label">Посадка</span><span class="extra-value">${fmtTm(f.boardingStart)} — ${fmtTm(f.boardingEnd)}</span></div>
       <div class="modal-fs-extra-item"><span class="extra-label">Стойки</span><span class="extra-value">${f.checkInCounters || '—'}</span></div>
-      ` : ''}
+    </div>` : ''}
+    <div class="modal-fs-extra" style="margin-top:12px;">
+      <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
     </div>`;
 
   $('modalOverlay').classList.add('show');
@@ -360,6 +335,7 @@ document.querySelectorAll('#modeDeparture .tab-btn').forEach(btn => {
     document.querySelectorAll('#modeDeparture .tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTabDep = btn.dataset.tab;
+    $('boardYesterdayDep').style.display = currentTabDep === 'yesterday' ? '' : 'none';
     $('boardTodayDep').style.display = currentTabDep === 'today' ? '' : 'none';
     $('boardTomorrowDep').style.display = currentTabDep === 'tomorrow' ? '' : 'none';
   });
@@ -370,6 +346,7 @@ document.querySelectorAll('#modeArrival .tab-btn').forEach(btn => {
     document.querySelectorAll('#modeArrival .tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTabArr = btn.dataset.tab;
+    $('boardYesterdayArr').style.display = currentTabArr === 'yesterday' ? '' : 'none';
     $('boardTodayArr').style.display = currentTabArr === 'today' ? '' : 'none';
     $('boardTomorrowArr').style.display = currentTabArr === 'tomorrow' ? '' : 'none';
   });
@@ -380,25 +357,18 @@ $('toggleDepartedDep').addEventListener('click', () => {
   showDepartedDep = !showDepartedDep;
   $('toggleDepartedDep').classList.toggle('active', showDepartedDep);
   $('toggleDepartedDep').innerHTML = showDepartedDep ? '<i class="fas fa-eye-slash"></i> Скрыть вылетевшие' : '<i class="fas fa-eye"></i> Показать вылетевшие';
-  loadDep();
+  renderAllDep();
 });
 
 $('toggleDepartedArr').addEventListener('click', () => {
   showDepartedArr = !showDepartedArr;
   $('toggleDepartedArr').classList.toggle('active', showDepartedArr);
   $('toggleDepartedArr').innerHTML = showDepartedArr ? '<i class="fas fa-eye-slash"></i> Скрыть прибывшие' : '<i class="fas fa-eye"></i> Показать прибывшие';
-  loadArr();
+  renderAllArr();
 });
 
-$('adminToggleDep').onclick = () => {
-  const admin = $('adminDeparture');
-  admin.style.display = admin.style.display !== 'none' ? 'none' : 'block';
-};
-
-$('adminToggleArr').onclick = () => {
-  const admin = $('adminArrival');
-  admin.style.display = admin.style.display !== 'none' ? 'none' : 'block';
-};
+$('adminToggleDep').onclick = () => { $('adminDeparture').style.display = $('adminDeparture').style.display !== 'none' ? 'none' : 'block'; };
+$('adminToggleArr').onclick = () => { $('adminArrival').style.display = $('adminArrival').style.display !== 'none' ? 'none' : 'block'; };
 
 // ============ ФОРМЫ ВЫЛЕТ ============
 $('addFlightDep').onclick = () => { editingId = null; $('formTitleDep').textContent = 'Новый рейс'; $('flightFormInnerDep').reset(); $('flightIdDep').value = ''; $('statusDep').value = 'scheduled'; $('flightFormDep').style.display = 'block'; };
@@ -409,11 +379,8 @@ window.editFlightDep = function(id) {
   if (!f) return;
   editingId = id;
   $('formTitleDep').textContent = 'Редактировать рейс';
-  $('flightIdDep').value = f.id;
-  $('flightNumberDep').value = f.flightNumber;
-  $('airlineDep').value = f.airline;
-  $('destinationDep').value = f.destination;
-  $('iataCodeDep').value = f.iataCode || '';
+  $('flightIdDep').value = f.id; $('flightNumberDep').value = f.flightNumber; $('airlineDep').value = f.airline;
+  $('destinationDep').value = f.destination; $('iataCodeDep').value = f.iataCode || '';
   $('scheduledDepartureDep').value = f.scheduledDeparture ? f.scheduledDeparture.slice(0, 16) : '';
   $('expectedDepartureDep').value = f.expectedDeparture ? f.expectedDeparture.slice(0, 16) : '';
   $('checkInStartDep').value = f.checkInStart ? f.checkInStart.slice(0, 16) : '';
@@ -426,19 +393,13 @@ window.editFlightDep = function(id) {
   $('flightFormDep').style.display = 'block';
 };
 
-window.deleteFlightDep = async function(id) {
-  if (!confirm('Удалить рейс?')) return;
-  await fetch(`${API}/${id}?type=departure`, { method:'DELETE' });
-  loadDep();
-};
+window.deleteFlightDep = async function(id) { if (!confirm('Удалить?')) return; await fetch(`${API}/${id}?type=departure`, { method:'DELETE' }); loadDep(); };
 
 $('flightFormInnerDep').onsubmit = async function(e) {
   e.preventDefault();
   const body = {
-    flightNumber: $('flightNumberDep').value,
-    airline: $('airlineDep').value,
-    destination: $('destinationDep').value,
-    iataCode: $('iataCodeDep').value.toUpperCase(),
+    flightNumber: $('flightNumberDep').value, airline: $('airlineDep').value,
+    destination: $('destinationDep').value, iataCode: $('iataCodeDep').value.toUpperCase(),
     scheduledDeparture: $('scheduledDepartureDep').value ? $('scheduledDepartureDep').value + ':00' : null,
     expectedDeparture: $('expectedDepartureDep').value ? $('expectedDepartureDep').value + ':00' : null,
     checkInStart: $('checkInStartDep').value ? $('checkInStartDep').value + ':00' : null,
@@ -446,14 +407,11 @@ $('flightFormInnerDep').onsubmit = async function(e) {
     checkInCounters: $('checkInCountersDep').value,
     boardingStart: $('boardingStartDep').value ? $('boardingStartDep').value + ':00' : null,
     boardingEnd: $('boardingEndDep').value ? $('boardingEndDep').value + ':00' : null,
-    boardingGate: $('boardingGateDep').value,
-    status: $('statusDep').value
+    boardingGate: $('boardingGateDep').value, status: $('statusDep').value
   };
   const url = editingId ? `${API}/${editingId}?type=departure` : `${API}?type=departure`;
   await fetch(url, { method: editingId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-  $('flightFormDep').style.display = 'none';
-  editingId = null;
-  loadDep();
+  $('flightFormDep').style.display = 'none'; editingId = null; loadDep();
 };
 
 // ============ ФОРМЫ ПРИЛЁТ ============
@@ -465,45 +423,29 @@ window.editFlightArr = function(id) {
   if (!f) return;
   editingId = id;
   $('formTitleArr').textContent = 'Редактировать рейс';
-  $('flightIdArr').value = f.id;
-  $('flightNumberArr').value = f.flightNumber;
-  $('airlineArr').value = f.airline;
-  $('destinationArr').value = f.destination;
-  $('iataCodeArr').value = f.iataCode || '';
+  $('flightIdArr').value = f.id; $('flightNumberArr').value = f.flightNumber; $('airlineArr').value = f.airline;
+  $('destinationArr').value = f.destination; $('iataCodeArr').value = f.iataCode || '';
   $('scheduledDepartureArr').value = f.scheduledDeparture ? f.scheduledDeparture.slice(0, 16) : '';
   $('expectedDepartureArr').value = f.expectedDeparture ? f.expectedDeparture.slice(0, 16) : '';
   $('statusArr').value = f.status;
   $('flightFormArr').style.display = 'block';
 };
 
-window.deleteFlightArr = async function(id) {
-  if (!confirm('Удалить рейс?')) return;
-  await fetch(`${API}/${id}?type=arrival`, { method:'DELETE' });
-  loadArr();
-};
+window.deleteFlightArr = async function(id) { if (!confirm('Удалить?')) return; await fetch(`${API}/${id}?type=arrival`, { method:'DELETE' }); loadArr(); };
 
 $('flightFormInnerArr').onsubmit = async function(e) {
   e.preventDefault();
   const body = {
-    flightNumber: $('flightNumberArr').value,
-    airline: $('airlineArr').value,
-    destination: $('destinationArr').value,
-    iataCode: $('iataCodeArr').value.toUpperCase(),
+    flightNumber: $('flightNumberArr').value, airline: $('airlineArr').value,
+    destination: $('destinationArr').value, iataCode: $('iataCodeArr').value.toUpperCase(),
     scheduledDeparture: $('scheduledDepartureArr').value ? $('scheduledDepartureArr').value + ':00' : null,
     expectedDeparture: $('expectedDepartureArr').value ? $('expectedDepartureArr').value + ':00' : null,
     status: $('statusArr').value
   };
   const url = editingId ? `${API}/${editingId}?type=arrival` : `${API}?type=arrival`;
   await fetch(url, { method: editingId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-  $('flightFormArr').style.display = 'none';
-  editingId = null;
-  loadArr();
+  $('flightFormArr').style.display = 'none'; editingId = null; loadArr();
 };
 
-setInterval(() => {
-  if (currentMode === 'departure') loadDep();
-  else loadArr();
-}, 30000);
-
-loadDep();
-loadArr();
+setInterval(() => { if (currentMode === 'departure') loadDep(); else loadArr(); }, 30000);
+loadDep(); loadArr();
