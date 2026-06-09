@@ -16,6 +16,9 @@
     <header class="header">
       <div class="header-inner">
         <div class="header-left">
+          <a href="https://ar-tum.tilda.ws" target="_blank" class="home-btn" title="На главную">
+            <i class="fas fa-home"></i> <span class="hide-mobile">На главную</span>
+          </a>
           <div class="logo"><i class="fas fa-plane-departure"></i></div>
           <div class="header-info">
             <h1>Аэропорт Тюменский</h1>
@@ -24,6 +27,9 @@
         </div>
         <div class="header-center"><div class="iata-badge">TUM</div></div>
         <div class="header-right">
+          <a href="https://www.vnukovo.ru/ru/for-passengers/reysi/aviakompanii/" target="_blank" class="refund-btn-header">
+            <i class="fas fa-ticket-alt"></i> <span class="hide-mobile">Возврат билетов</span>
+          </a>
           <div class="live-clock"><span id="clockTime">00:00</span><span class="live-dot"></span></div>
         </div>
       </div>
@@ -84,11 +90,17 @@
       </div>
 
       <div class="tabs-bar">
+        <button class="tab-btn" data-tab="yesterday">ВЧЕРА</button>
         <button class="tab-btn active" data-tab="today">СЕГОДНЯ</button>
         <button class="tab-btn" data-tab="tomorrow">ЗАВТРА</button>
         <div class="departed-toggle">
           <button class="btn-departed" id="toggleDepartedDep"><i class="fas fa-eye"></i> Показать вылетевшие</button>
         </div>
+      </div>
+
+      <div class="board" id="boardYesterdayDep" style="display:none;">
+        <div class="board-top"><div class="board-top-left"><h2>ВЫЛЕТ • ВЧЕРА</h2></div><div class="board-top-right"><span class="update-text">Обновлено: <strong id="lastUpdatedDepY">--:--</strong></span></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Время</th><th>Направление</th><th>Рейс</th><th>Авиакомпания</th><th>Выход</th><th>Статус</th></tr></thead><tbody id="flightsYesterdayDep"></tbody></table></div>
       </div>
 
       <div class="board" id="boardTodayDep">
@@ -143,11 +155,17 @@
       </div>
 
       <div class="tabs-bar">
+        <button class="tab-btn" data-tab="yesterday">ВЧЕРА</button>
         <button class="tab-btn active" data-tab="today">СЕГОДНЯ</button>
         <button class="tab-btn" data-tab="tomorrow">ЗАВТРА</button>
         <div class="departed-toggle">
           <button class="btn-departed" id="toggleDepartedArr"><i class="fas fa-eye"></i> Показать прибывшие</button>
         </div>
+      </div>
+
+      <div class="board" id="boardYesterdayArr" style="display:none;">
+        <div class="board-top"><div class="board-top-left"><h2>ПРИЛЁТ • ВЧЕРА</h2></div><div class="board-top-right"><span class="update-text">Обновлено: <strong id="lastUpdatedArrY">--:--</strong></span></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Время</th><th>Откуда</th><th>Рейс</th><th>Авиакомпания</th><th>Выход</th><th>Статус</th></tr></thead><tbody id="flightsYesterdayArr"></tbody></table></div>
       </div>
 
       <div class="board" id="boardTodayArr">
@@ -161,11 +179,6 @@
       </div>
     </div>
   </div>
-
-  <!-- КНОПКА ВОЗВРАТ БИЛЕТОВ -->
-  <a href="https://www.vnukovo.ru/ru/for-passengers/reysi/aviakompanii/" target="_blank" class="refund-btn">
-    <i class="fas fa-ticket-alt"></i> Возврат билетов
-  </a>
 
   <!-- МОДАЛЬНОЕ ОКНО -->
   <div class="modal-overlay" id="modalOverlay">
