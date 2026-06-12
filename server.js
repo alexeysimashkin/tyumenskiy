@@ -133,7 +133,7 @@ function getFlightDay(f) {
   if (!dep || isNaN(dep.getTime())) return 'today';
   
   const now = getLocalNow();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const todayStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0));
   const tomorrowStart = new Date(todayStart.getTime() + 86400000);
   
   if (dep >= tomorrowStart) return 'tomorrow';
