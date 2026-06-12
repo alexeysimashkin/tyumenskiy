@@ -114,7 +114,11 @@ function renderFlightRow(f, showDepartedBtn) {
 }
 
 function getFlightDayDate(f) {
-  const d = f.scheduledDeparture ? new Date(f.scheduledDeparture) : null;
+  const d = f.expectedDeparture 
+    ? new Date(f.expectedDeparture) 
+    : f.scheduledDeparture 
+      ? new Date(f.scheduledDeparture) 
+      : null;
   if (!d || isNaN(d.getTime())) return 'today';
   const ds = d.toISOString().slice(0,10);
   if (ds === getYesterday()) return 'yesterday';
