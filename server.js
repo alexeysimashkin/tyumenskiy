@@ -146,10 +146,13 @@ app.get('/api/flights', async (req, res) => {
   let flights = await load(table);
   const showDep = req.query.showDeparted === 'true';
   const today = getLocalNow().toISOString().slice(0, 10);
+  const yesterday = new Date(getLocalNow());
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
   
   const cleaned = flights.filter(f => {
     if ((f.status === 'departed' || f.status === 'early_departed' || f.status === 'arrived') && f.scheduledDeparture) {
-      return f.scheduledDeparture.slice(0, 10) >= today;
+      return f.scheduledDeparture.slice(0, 10) >= yesterdayStr;
     }
     return true;
   });
