@@ -105,16 +105,6 @@ function getArrivalStatusText(f) {
   return 'По расписанию';
 }
 
-function getFlightDay(f) {
-  const dep = f.expectedDeparture ? new Date(f.expectedDeparture) : f.scheduledDeparture ? new Date(f.scheduledDeparture) : null;
-  if (!dep || isNaN(dep.getTime())) return 'today';
-  const now = getLocalNow();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const tomorrowStart = new Date(todayStart.getTime() + 86400000);
-  if (dep >= tomorrowStart) return 'tomorrow';
-  return 'today';
-}
-
 app.get('/api/flights', async (req, res) => {
   const type = req.query.type || 'departure';
   const table = type === 'departure' ? 'departures' : 'arrivals';
@@ -135,7 +125,7 @@ app.get('/api/flights', async (req, res) => {
     if (type === 'departure') flights = flights.filter(f => f.status !== 'departed' && f.status !== 'early_departed');
     else flights = flights.filter(f => f.status !== 'arrived');
   }
-  flights = flights.map(f => ({ ...f, computedStatus: type==='departure'?computeStatus(f):computeArrivalStatus(f), statusText: type==='departure'?getStatusText(f):getArrivalStatusText(f), flightDay: getFlightDay(f) }));
+  flights = flights.map(f => ({ ...f, computedStatus: type==='departure'?computeStatus(f):computeArrivalStatus(f), statusText: type==='departure'?getStatusText(f):getArrivalStatusText(f) }));
   flights.sort((a, b) => (a.expectedDeparture||a.scheduledDeparture||'').localeCompare(b.expectedDeparture||b.scheduledDeparture||''));
   res.json(flights);
 });
