@@ -109,8 +109,14 @@ function renderFlightRow(f) {
   </tr>`;
 }
 
-// ЕДИНАЯ функция определения даты рейса
 function getDateStr(f) {
+  // Для departed всегда смотрим на scheduledDeparture
+  if (f.status === 'departed' || f.status === 'early_departed' || f.status === 'arrived') {
+    const d = f.scheduledDeparture ? new Date(f.scheduledDeparture) : null;
+    if (!d || isNaN(d.getTime())) return getToday();
+    return d.toISOString().slice(0, 10);
+  }
+  // Для активных — на expected если есть
   const d = f.expectedDeparture 
     ? new Date(f.expectedDeparture) 
     : f.scheduledDeparture 
@@ -125,25 +131,19 @@ function renderAllDep() {
   const today = getToday();
   const tomorrow = getTomorrow();
 
-  // Админка: показываем только сегодняшние + завтрашние (не departed)
   const adminFlights = flightsDep.filter(f => {
-    if (f.status === 'departed' || f.status === 'early_departed') {
-      if (showDepartedDep) return true;
-      return false;
-    }
+    if (f.status === 'departed' || f.status === 'early_departed') return showDepartedDep;
     const d = getDateStr(f);
     return d === today || d === tomorrow;
   });
   
   if ($('adminFlightsListDep')) {
-    if (!adminFlights.length) {
-      $('adminFlightsListDep').innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>';
-    } else {
-      $('adminFlightsListDep').innerHTML = adminFlights.map(f => `<div class="admin-row"><div class="admin-row-info"><span class="admin-row-number">${f.flightNumber}</span><span class="admin-row-route">${f.destination} (${f.iataCode||''})</span><span class="status-tag ${getTagClass(f)}" style="font-size:10px;">${(f.statusText||'').replace(/\n/g,' ')}</span></div><div class="admin-row-actions"><button class="btn-icon" onclick="event.stopPropagation();editFlightDep('${f.id}')"><i class="fas fa-pen"></i></button><button class="btn-icon danger" onclick="event.stopPropagation();deleteFlightDep('${f.id}')"><i class="fas fa-trash"></i></button></div></div>`).join('');
-    }
+    $('adminFlightsListDep').innerHTML = adminFlights.length === 0
+      ? '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>'
+      : adminFlights.map(f => `<div class="admin-row"><div class="admin-row-info"><span class="admin-row-number">${f.flightNumber}</span><span class="admin-row-route">${f.destination} (${f.iataCode||''})</span><span class="status-tag ${getTagClass(f)}" style="font-size:10px;">${(f.statusText||'').replace(/\n/g,' ')}</span></div><div class="admin-row-actions"><button class="btn-icon" onclick="event.stopPropagation();editFlightDep('${f.id}')"><i class="fas fa-pen"></i></button><button class="btn-icon danger" onclick="event.stopPropagation();deleteFlightDep('${f.id}')"><i class="fas fa-trash"></i></button></div></div>`).join('');
   }
   
-  // Вчера: ВСЕ рейсы, включая departed
+  // Вчера
   const yesterdayFlights = flightsDep.filter(f => getDateStr(f) === yesterday);
   if ($('flightsYesterdayDep')) {
     $('flightsYesterdayDep').innerHTML = yesterdayFlights.length === 0
@@ -151,7 +151,7 @@ function renderAllDep() {
       : yesterdayFlights.map(f => renderFlightRow(f)).join('');
   }
   
-  // Сегодня: departed скрываем если showDepartedDep выключен
+  // Сегодня
   const todayFlights = flightsDep.filter(f => {
     if (getDateStr(f) !== today) return false;
     if ((f.status === 'departed' || f.status === 'early_departed') && !showDepartedDep) return false;
@@ -163,7 +163,7 @@ function renderAllDep() {
       : todayFlights.map(f => renderFlightRow(f)).join('');
   }
   
-  // Завтра: departed не показываем
+  // Завтра
   const tomorrowFlights = flightsDep.filter(f => {
     if (getDateStr(f) !== tomorrow) return false;
     if (f.status === 'departed' || f.status === 'early_departed') return false;
@@ -176,7 +176,6 @@ function renderAllDep() {
   }
 }
 
-// ============ ПРИЛЁТ ============
 async function loadArr() {
   try {
     const r = await fetch(`${API}?type=arrival&showDeparted=true`);
@@ -219,25 +218,22 @@ function renderAllArr() {
   const tomorrow = getTomorrow();
 
   const adminFlights = flightsArr.filter(f => {
-    if (f.status === 'arrived') {
-      if (showDepartedArr) return true;
-      return false;
-    }
+    if (f.status === 'arrived') return showDepartedArr;
     const d = getDateStr(f);
     return d === today || d === tomorrow;
   });
   
   if ($('adminFlightsListArr')) {
-    if (!adminFlights.length) {
-      $('adminFlightsListArr').innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>';
-    } else {
-      $('adminFlightsListArr').innerHTML = adminFlights.map(f => `<div class="admin-row"><div class="admin-row-info"><span class="admin-row-number">${f.flightNumber}</span><span class="admin-row-route">${f.destination} (${f.iataCode||''})</span><span class="status-tag ${getTagClassArr(f)}" style="font-size:10px;">${(f.statusText||'').replace(/\n/g,' ')}</span></div><div class="admin-row-actions"><button class="btn-icon" onclick="event.stopPropagation();editFlightArr('${f.id}')"><i class="fas fa-pen"></i></button><button class="btn-icon danger" onclick="event.stopPropagation();deleteFlightArr('${f.id}')"><i class="fas fa-trash"></i></button></div></div>`).join('');
-    }
+    $('adminFlightsListArr').innerHTML = adminFlights.length === 0
+      ? '<p style="text-align:center;color:var(--gray-400);padding:20px;">Нет рейсов</p>'
+      : adminFlights.map(f => `<div class="admin-row"><div class="admin-row-info"><span class="admin-row-number">${f.flightNumber}</span><span class="admin-row-route">${f.destination} (${f.iataCode||''})</span><span class="status-tag ${getTagClassArr(f)}" style="font-size:10px;">${(f.statusText||'').replace(/\n/g,' ')}</span></div><div class="admin-row-actions"><button class="btn-icon" onclick="event.stopPropagation();editFlightArr('${f.id}')"><i class="fas fa-pen"></i></button><button class="btn-icon danger" onclick="event.stopPropagation();deleteFlightArr('${f.id}')"><i class="fas fa-trash"></i></button></div></div>`).join('');
   }
   
   const yesterdayFlights = flightsArr.filter(f => getDateStr(f) === yesterday);
   if ($('flightsYesterdayArr')) {
-    $('flightsYesterdayArr').innerHTML = yesterdayFlights.length === 0 ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов за вчера</p></div></td></tr>` : yesterdayFlights.map(f => renderFlightRowArr(f)).join('');
+    $('flightsYesterdayArr').innerHTML = yesterdayFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов за вчера</p></div></td></tr>`
+      : yesterdayFlights.map(f => renderFlightRowArr(f)).join('');
   }
   
   const todayFlights = flightsArr.filter(f => {
@@ -246,7 +242,9 @@ function renderAllArr() {
     return true;
   });
   if ($('flightsTodayArr')) {
-    $('flightsTodayArr').innerHTML = todayFlights.length === 0 ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на сегодня</p></div></td></tr>` : todayFlights.map(f => renderFlightRowArr(f)).join('');
+    $('flightsTodayArr').innerHTML = todayFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на сегодня</p></div></td></tr>`
+      : todayFlights.map(f => renderFlightRowArr(f)).join('');
   }
   
   const tomorrowFlights = flightsArr.filter(f => {
@@ -255,11 +253,12 @@ function renderAllArr() {
     return true;
   });
   if ($('flightsTomorrowArr')) {
-    $('flightsTomorrowArr').innerHTML = tomorrowFlights.length === 0 ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на завтра</p></div></td></tr>` : tomorrowFlights.map(f => renderFlightRowArr(f)).join('');
+    $('flightsTomorrowArr').innerHTML = tomorrowFlights.length === 0
+      ? `<tr class="empty"><td colspan="6"><div class="empty-msg"><i class="fas fa-plane-arrival"></i><p>Нет рейсов на завтра</p></div></td></tr>`
+      : tomorrowFlights.map(f => renderFlightRowArr(f)).join('');
   }
 }
 
-// ============ ДЕТАЛИ РЕЙСА ============
 window.showDetail = function(id, type) {
   const flights = type === 'departure' ? flightsDep : flightsArr;
   const f = flights.find(x => x.id === id);
