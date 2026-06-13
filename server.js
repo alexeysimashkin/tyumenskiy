@@ -10,33 +10,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-pool.query(`CREATE TABLE IF NOT EXISTS departures (id TEXT PRIMARY KEY, data JSONB NOT NULL)`).catch(e => console.log(e));
-pool.query(`CREATE TABLE IF NOT EXISTS arrivals (id TEXT PRIMARY KEY, data JSONB NOT NULL)`).catch(e => console.log(e));
+// Удали старые таблицы и создай заново
+pool.query(`DROP TABLE IF EXISTS departures, arrivals`).then(() => {
+  pool.query(`CREATE TABLE IF NOT EXISTS departures (id TEXT PRIMARY KEY, data JSONB NOT NULL)`);
+  pool.query(`CREATE TABLE IF NOT EXISTS arrivals (id TEXT PRIMARY KEY, data JSONB NOT NULL)`);
+}).catch(e => console.log(e));
 
 async function load(table) { try { const r = await pool.query(`SELECT data FROM ${table}`); return r.rows.map(x => x.data); } catch(e) { return []; } }
 async function saveOne(f, table) { await pool.query(`INSERT INTO ${table} (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2`, [f.id, JSON.stringify(f)]); }
-async function deleteOne(id, table) { await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]); }
-
-function getLocalNow() { const now = new Date(); const utc = now.getTime() + (now.getTimezoneOffset() * 60000); return new Date(utc + (5 * 3600000)); }
 
 app.get('/api/flights', async (req, res) => {
-  const type = req.query.type || 'departure';
-  const table = type === 'departure' ? 'departures' : 'arrivals';
-  let flights = await load(table);
-  res.json(flights);
+  const table = req.query.type === 'arrival' ? 'arrivals' : 'departures';
+  res.json(await load(table));
 });
 
 app.post('/api/flights', async (req, res) => {
-  const type = req.query.type || 'departure';
-  const table = type === 'departure' ? 'departures' : 'arrivals';
+  const table = req.query.type === 'arrival' ? 'arrivals' : 'departures';
   const f = { id: Date.now().toString(), flightNumber: req.body.flightNumber||'', destination: req.body.destination||'', iataCode: req.body.iataCode||'', airline: req.body.airline||'', scheduledDeparture: req.body.scheduledDeparture||null, expectedDeparture: req.body.expectedDeparture||null, checkInStart: req.body.checkInStart||null, checkInEnd: req.body.checkInEnd||null, checkInCounters: req.body.checkInCounters||'', boardingStart: req.body.boardingStart||null, boardingEnd: req.body.boardingEnd||null, boardingGate: req.body.boardingGate||'', status: req.body.status||'scheduled' };
   await saveOne(f, table);
   res.status(201).json(f);
 });
 
 app.put('/api/flights/:id', async (req, res) => {
-  const type = req.query.type || 'departure';
-  const table = type === 'departure' ? 'departures' : 'arrivals';
+  const table = req.query.type === 'arrival' ? 'arrivals' : 'departures';
   const flights = await load(table);
   const i = flights.findIndex(f => f.id === req.params.id);
   if (i === -1) return res.status(404).json({ error: 'Не найден' });
@@ -46,9 +42,8 @@ app.put('/api/flights/:id', async (req, res) => {
 });
 
 app.delete('/api/flights/:id', async (req, res) => {
-  const type = req.query.type || 'departure';
-  const table = type === 'departure' ? 'departures' : 'arrivals';
-  await deleteOne(req.params.id, table);
+  const table = req.query.type === 'arrival' ? 'arrivals' : 'departures';
+  await pool.query(`DELETE FROM ${table} WHERE id = $1`, [req.params.id]);
   res.status(204).send();
 });
 
