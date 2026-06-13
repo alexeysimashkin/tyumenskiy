@@ -114,7 +114,11 @@ function renderFlightRow(f, showDepartedBtn) {
 }
 
 function getDateStr(f) {
-  const d = f.scheduledDeparture ? new Date(f.scheduledDeparture) : null;
+  const d = f.expectedDeparture 
+    ? new Date(f.expectedDeparture) 
+    : f.scheduledDeparture 
+      ? new Date(f.scheduledDeparture) 
+      : null;
   if (!d || isNaN(d.getTime())) return getToday();
   return d.toISOString().slice(0, 10);
 }
@@ -130,7 +134,6 @@ function renderAllDep() {
     }
   }
   
-  // Вчера
   const yesterday = getYesterday();
   const yesterdayFlights = flightsDep.filter(f => getDateStr(f) === yesterday);
   if ($('flightsYesterdayDep')) {
@@ -139,7 +142,6 @@ function renderAllDep() {
       : yesterdayFlights.map(f => renderFlightRow(f, true)).join('');
   }
   
-  // Сегодня
   const today = getToday();
   const todayFlights = flightsDep.filter(f => {
     if (f.status === 'departed' || f.status === 'early_departed') return showDepartedDep;
@@ -151,7 +153,6 @@ function renderAllDep() {
       : todayFlights.map(f => renderFlightRow(f, showDepartedDep)).join('');
   }
   
-  // Завтра
   const tomorrow = getTomorrow();
   const tomorrowFlights = flightsDep.filter(f => {
     if (f.status === 'departed' || f.status === 'early_departed') return false;
