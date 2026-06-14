@@ -1,8 +1,8 @@
 :root {
-  --rose: #E11D8F;
-  --rose-dark: #BE1878;
-  --rose-light: #F472B6;
-  --rose-bg: #FCE7F3;
+  --rose: #DB2777;
+  --rose-dark: #BE185D;
+  --rose-light: #F9A8D4;
+  --rose-bg: #FDF2F8;
   --white: #FFFFFF;
   --gray-50: #F8FAFC;
   --gray-100: #F1F5F9;
@@ -28,7 +28,7 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: #FFF0F5;
+  background: #FFF5F7;
   color: var(--gray-800);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -49,13 +49,30 @@ body {
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .header-left { display: flex; align-items: center; gap: 10px; }
 
+.home-btn {
+  width: 36px; height: 36px;
+  background: var(--rose-bg);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--rose);
+  font-size: 16px;
+  text-decoration: none;
+  transition: all 0.2s;
+  border: 1px solid rgba(219,39,119,0.2);
+}
+
+.home-btn:hover {
+  background: var(--rose);
+  color: white;
+}
+
 .logo {
   width: 42px; height: 42px;
-  background: linear-gradient(135deg, var(--rose), var(--rose-dark));
+  background: linear-gradient(135deg, var(--rose-light), var(--rose));
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
   color: white; font-size: 18px;
-  box-shadow: 0 4px 14px rgba(225,29,143,0.3);
+  box-shadow: 0 4px 14px rgba(249,168,212,0.4);
 }
 
 .header-info h1 { font-size: 16px; font-weight: 800; color: var(--gray-800); }
@@ -65,10 +82,32 @@ body {
   background: linear-gradient(135deg, var(--rose-light), var(--rose));
   color: white; font-weight: 900; font-size: 18px;
   padding: 6px 16px; border-radius: 30px; letter-spacing: 3px;
-  box-shadow: 0 4px 18px rgba(244,114,182,0.3);
+  box-shadow: 0 4px 18px rgba(249,168,212,0.4);
 }
 
 .header-right { display: flex; align-items: center; gap: 12px; }
+
+.refund-btn {
+  background: var(--rose-bg);
+  color: var(--rose);
+  border: 1px solid rgba(219,39,119,0.2);
+  padding: 8px 14px;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 12px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+
+.refund-btn:hover {
+  background: var(--rose);
+  color: white;
+}
 
 .live-clock {
   font-size: 22px; font-weight: 700; color: var(--gray-800);
@@ -81,6 +120,8 @@ body {
 }
 
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.6)} }
+
+.hide-mobile { }
 
 /* MAIN TABS */
 .main-tabs { display: flex; gap: 0; margin-bottom: 16px; }
@@ -115,13 +156,12 @@ body {
   margin-bottom: 16px;
   transition: all 0.2s;
   font-family: 'Inter', sans-serif;
-  box-shadow: 0 4px 14px rgba(225,29,143,0.3);
+  box-shadow: 0 4px 14px rgba(249,168,212,0.4);
 }
 
 .admin-toggle-btn:hover {
   background: var(--rose-dark);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(225,29,143,0.4);
 }
 
 .admin-toggle-btn i { font-size: 16px; }
@@ -141,13 +181,13 @@ body {
   padding: 10px 18px; border-radius: 25px; font-weight: 600; font-size: 13px;
   cursor: pointer; display: flex; align-items: center; gap: 6px;
   transition: all 0.2s; font-family: 'Inter', sans-serif;
-  box-shadow: 0 2px 10px rgba(225,29,143,0.25);
+  box-shadow: 0 2px 10px rgba(219,39,119,0.25);
 }
 
 .btn-primary:hover { background: var(--rose-dark); transform: translateY(-1px); }
 
 .form-card {
-  background: var(--rose-bg); border: 1px solid rgba(225,29,143,0.15);
+  background: var(--rose-bg); border: 1px solid rgba(219,39,119,0.15);
   border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px;
 }
 
@@ -166,7 +206,7 @@ body {
   transition: all 0.2s; background: white;
 }
 
-.field input:focus, .field select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(225,29,143,0.08); }
+.field input:focus, .field select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,39,119,0.08); }
 
 .form-actions { display: flex; gap: 8px; margin-top: 14px; }
 
@@ -183,7 +223,7 @@ body {
   transition: all 0.2s; flex-wrap: wrap; gap: 8px;
 }
 
-.admin-row:hover { background: var(--rose-bg); border-color: rgba(225,29,143,0.25); }
+.admin-row:hover { background: var(--rose-bg); border-color: rgba(219,39,119,0.25); }
 .admin-row-info { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .admin-row-number { font-weight: 800; color: var(--rose); font-size: 14px; }
 .admin-row-route { color: var(--gray-600); font-size: 13px; }
@@ -235,7 +275,7 @@ body {
 .board-top {
   display: flex; justify-content: space-between; align-items: center;
   padding: 14px 20px;
-  background: linear-gradient(135deg, var(--rose), var(--rose-dark));
+  background: linear-gradient(135deg, var(--rose-light), var(--rose));
   color: white;
 }
 
@@ -275,7 +315,6 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
   flex-shrink: 0;
 }
 
-/* GATE — желтый фон, черный текст */
 .gate-cell {
   font-weight: 700;
   color: #000;
@@ -311,35 +350,6 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
 .empty-msg { text-align: center; color: var(--gray-400); }
 .empty-msg i { font-size: 32px; margin-bottom: 6px; opacity: 0.3; }
 .empty-msg p { font-size: 14px; font-weight: 500; }
-
-/* REFUND BUTTON */
-.refund-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: var(--white);
-  color: var(--rose);
-  border: 2px solid var(--rose);
-  padding: 14px 22px;
-  border-radius: 50px;
-  font-weight: 700;
-  font-size: 14px;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 6px 20px rgba(225,29,143,0.2);
-  transition: all 0.3s;
-  z-index: 99;
-  font-family: 'Inter', sans-serif;
-}
-
-.refund-btn:hover {
-  background: var(--rose);
-  color: white;
-  transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(225,29,143,0.35);
-}
 
 /* MODAL */
 .modal-overlay {
@@ -464,7 +474,7 @@ td { padding: 14px 10px; font-size: 13px; font-weight: 500; color: var(--gray-80
   .btn-departed { width: 100%; justify-content: center; }
   .admin-top { flex-direction: column; align-items: flex-start; }
   .btn-primary { width: 100%; justify-content: center; }
-  .refund-btn { bottom: 10px; right: 10px; padding: 10px 16px; font-size: 12px; }
+  .hide-mobile { display: none; }
 }
 
 @media (max-width: 480px) {
