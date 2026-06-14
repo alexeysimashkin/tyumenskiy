@@ -42,7 +42,6 @@ function fmtDateOnly(s) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-// Переключение режимов
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
@@ -55,7 +54,6 @@ document.querySelectorAll('.main-tab').forEach(btn => {
   });
 });
 
-// ============ ВЫЛЕТ ============
 async function loadDep() {
   try {
     const r = await fetch(`${API}?type=departure&showDeparted=${showDepartedDep}`);
@@ -154,7 +152,6 @@ function renderAllDep() {
   }
 }
 
-// ============ ПРИЛЁТ ============
 async function loadArr() {
   try {
     const r = await fetch(`${API}?type=arrival&showDeparted=${showDepartedArr}`);
@@ -251,7 +248,6 @@ function renderAllArr() {
   }
 }
 
-// ============ ДЕТАЛИ РЕЙСА ============
 window.showDetail = function(id, type) {
   const flights = type === 'departure' ? flightsDep : flightsArr;
   const f = flights.find(x => x.id === id);
@@ -332,9 +328,6 @@ window.showDetail = function(id, type) {
         </div>` : ''}` : ''}
       </div>
     </div>` : ''}
-    <div class="modal-fs-status">
-      <span class="status-tag ${tagClass}" style="font-size:15px;padding:10px 24px;">${(f.statusText || 'По расписанию').replace(/\n/g,'<br>')}</span>
-    </div>
     <div class="modal-fs-extra">
       <div class="modal-fs-extra-item"><span class="extra-label">Авиакомпания</span><span class="extra-value">${f.airline || '—'}</span></div>
       <div class="modal-fs-extra-item"><span class="extra-label">По расписанию</span><span class="extra-value">${fmtDt(f.scheduledDeparture)}</span></div>
@@ -354,7 +347,6 @@ $('modalClose').onclick = () => { $('modalOverlay').classList.remove('show'); do
 $('modalOverlay').onclick = e => { if (e.target === $('modalOverlay')) { $('modalOverlay').classList.remove('show'); document.body.style.overflow = ''; } };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('modalOverlay').classList.remove('show'); document.body.style.overflow = ''; } });
 
-// ============ ВКЛАДКИ ============
 document.querySelectorAll('#modeDeparture .tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#modeDeparture .tab-btn').forEach(b => b.classList.remove('active'));
@@ -375,7 +367,6 @@ document.querySelectorAll('#modeArrival .tab-btn').forEach(btn => {
   });
 });
 
-// ============ КНОПКИ ============
 $('toggleDepartedDep').addEventListener('click', () => {
   showDepartedDep = !showDepartedDep;
   $('toggleDepartedDep').classList.toggle('active', showDepartedDep);
@@ -400,7 +391,6 @@ $('adminToggleArr').onclick = () => {
   admin.style.display = admin.style.display !== 'none' ? 'none' : 'block';
 };
 
-// ============ ФОРМЫ ВЫЛЕТ ============
 $('addFlightDep').onclick = () => { editingId = null; $('formTitleDep').textContent = 'Новый рейс'; $('flightFormInnerDep').reset(); $('flightIdDep').value = ''; $('statusDep').value = 'scheduled'; $('flightFormDep').style.display = 'block'; };
 $('cancelFormDep').onclick = () => { $('flightFormDep').style.display = 'none'; };
 
@@ -456,7 +446,6 @@ $('flightFormInnerDep').onsubmit = async function(e) {
   loadDep();
 };
 
-// ============ ФОРМЫ ПРИЛЁТ ============
 $('addFlightArr').onclick = () => { editingId = null; $('formTitleArr').textContent = 'Новый рейс'; $('flightFormInnerArr').reset(); $('flightIdArr').value = ''; $('statusArr').value = 'scheduled'; $('flightFormArr').style.display = 'block'; };
 $('cancelFormArr').onclick = () => { $('flightFormArr').style.display = 'none'; };
 
