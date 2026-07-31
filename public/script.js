@@ -305,22 +305,13 @@ if (toggleDeparted) {
   });
 }
 
-// ============ КНОПКА УПРАВЛЕНИЯ С ПАРОЛЕМ ============
-if ($('adminToggle')) {
-  $('adminToggle').onclick = () => {
-    const password = prompt('Введите пароль для доступа к управлению:');
-    if (password === 'J6NBVCH71910') {
-      adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
-    } else if (password !== null) {
-      alert('Неверный пароль!');
-    }
-  };
-}
+$('adminToggle').onclick = () => {
+  adminPanel.style.display = adminPanel.style.display !== 'none' ? 'none' : 'block';
+};
 
 if ($('addFlightBtn')) $('addFlightBtn').onclick = () => { editingId = null; formTitle.textContent = 'Новый рейс'; $('flightFormInner').reset(); $('flightId').value = ''; $('status').value = 'scheduled'; flightForm.style.display = 'block'; };
 if ($('cancelForm')) $('cancelForm').onclick = () => { flightForm.style.display = 'none'; };
 
-// ============ КНОПКА УДАЛЕНИЯ ПРОШЛЫХ РЕЙСОВ ============
 if ($('btnDeleteOldFlights')) {
   $('btnDeleteOldFlights').addEventListener('click', async () => {
     if (!confirm('Удалить прошлые рейсы без статуса «Вылетел»?')) return;
